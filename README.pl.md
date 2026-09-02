@@ -18,7 +18,8 @@ To ważniejsze od każdej funkcji, więc stoi na początku.
 
 - **Nic nie jest wysyłane.** CHRONOS nie ma konta, serwera ani telemetrii.
   Agent nasłuchuje wyłącznie na pętli zwrotnej, więc z innego komputera jest
-  niewidoczny.
+  niewidoczny. Nawet fonty leżą lokalnie (`fonts/`) — aplikacja nie robi ani
+  jednego zapytania poza własny komputer i wygląda tak samo bez internetu.
 - **Historia leży w przeglądarce**, w `localStorage`, wewnątrz katalogu
   `.chronos-profile` obok aplikacji. Nigdy nie jest zapisywana do pliku
   projektu.
@@ -44,9 +45,10 @@ kasuje.
 ## Uruchomienie
 
 **Dwuklik w `CHRONOS.lnk` na pulpicie** (albo `CHRONOS.vbs` w tym folderze).
-Tyle. Otwiera się okno aplikacji bez pasków przeglądarki, a w tle startuje
-serwer i agent czytający aktywne okno. **Zamknięcie okna kończy wszystko** —
-nic nie zostaje w tle.
+Tyle. Otwiera się **zmaksymalizowane** okno aplikacji bez pasków przeglądarki,
+a w tle startuje serwer i agent czytający aktywne okno. **Zamknięcie okna
+kończy wszystko** — nic nie zostaje w tle. Na szerokich monitorach układ
+rośnie razem z oknem: większa tarcza, szersze kolumny.
 
 | Plik | Kiedy |
 |---|---|
@@ -406,6 +408,7 @@ Dwa zabezpieczenia po tym, jak podczas testów sam skasowałem sobie dane:
 CHRONOS.vbs  — uruchomienie jednym kliknięciem
 chronos.py   — serwer + agent + okno aplikacji w jednym procesie
 chronos.ico  — ikona skrótu
+fonts/       — Inter i JetBrains Mono lokalnie (latin + latin-ext, OFL)
 index.html   — struktura i okna dialogowe
 styles.css   — design system (tokeny, typografia, komponenty)
 app.js       — stan, pomiar, dziennik aktywności, ranking, statystyki
@@ -437,14 +440,30 @@ Trzy decyzje, dzięki którym da się na to patrzeć przez cały dzień pracy:
   intersect`) wycinają dziurę na tarczę i wygaszają brzegi, a szyna kategorii
   i panel statystyk są nieprzezroczyste. Zostaje pierścień znaków wokół
   zegara — tło, a nie tapeta pod tekstem.
-- **Kosztuje mało.** ~18 klatek na sekundę zamiast 60, pętla na
-  `requestAnimationFrame`, więc przy zminimalizowanym oknie przeglądarka
-  zatrzymuje ją sama.
+- **Kosztuje mało.** ~18 klatek na sekundę zamiast 60, a gdy okno traci
+  fokus — ~7: deszcz dalej pada, ale nie bierze procesora spod pracy. Pętla
+  stoi na `requestAnimationFrame`, więc przy zminimalizowanym oknie
+  przeglądarka zatrzymuje ją sama. Płótno liczone jest maksymalnie w 1.5×
+  gęstości piksela — tło przygaszone maską nie potrzebuje więcej.
 - **Da się wyłączyć ruch.** `prefers-reduced-motion` zostawia jedną statyczną
   klatkę zamiast animacji.
 
 Powierzchnie są zielono-czarne, a nie neutralnie czarne, i to nie jest
 ozdobnik: panel w chłodnej szarości nad ciepłym zielonym deszczem wyglądałby
-jak naklejony na tapetę. Każdy tekst ma
+jak naklejony na tapetę.
+
+### Budżet procesora
+
+Aplikacja wisi na ekranie cały dzień, więc każdy cykl ma uzasadnienie:
+
+- łuk i cyfry tarczy odświeżają się co 250 ms, ale panel dnia, szyna
+  kategorii i otwarte statystyki są przebudowywane **raz na sekundę** —
+  częściej i tak nie mają czego pokazać,
+- ukryte okno nie maluje nic; zostaje sama logika celu sesji, żeby
+  powiadomienie nie przepadło,
+- mini-nakładka porównuje klatkę ze stemplem stanu i wychodzi natychmiast,
+  gdy nic się nie zmieniło — okno PiP nie jest dławione przez przeglądarkę,
+  więc bez tego liczyłaby klasyfikator co pół sekundy przez cały dzień,
+- deszcz znaków zwalnia bez fokusu (opisane wyżej). Każdy tekst ma
 zdefiniowane obcinanie — nawet 200-znakowy tytuł karty nie rozpycha układu.
 Interfejs respektuje `prefers-reduced-motion`.

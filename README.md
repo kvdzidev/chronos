@@ -19,7 +19,8 @@ This matters more than any feature, so it comes first.
 
 - **Nothing is uploaded.** CHRONOS has no account, no server and no telemetry.
   The agent listens on the loopback interface only, so it is not reachable from
-  another machine.
+  another machine. Even the fonts live locally (`fonts/`) — the app makes not a
+  single request beyond your machine and looks the same with no internet.
 - **Your history lives in the browser**, in `localStorage`, inside the
   `.chronos-profile` folder that ships next to the app. It is never written into
   a project file.
@@ -47,9 +48,10 @@ tracking data does not reset it.
 ## Running it
 
 **Double-click `CHRONOS.lnk` on the desktop** (or `CHRONOS.vbs` in this folder).
-That is all. A window opens without browser chrome, and the server plus the
-window-reading agent start behind it. **Closing the window ends everything** —
-nothing is left running.
+That is all. A **maximised** window opens without browser chrome, and the server
+plus the window-reading agent start behind it. **Closing the window ends
+everything** — nothing is left running. On wide monitors the layout grows with
+the window: a larger dial, wider columns.
 
 | File | When to use it |
 |---|---|
@@ -392,6 +394,7 @@ Two safeguards, added after I deleted my own data during testing:
 CHRONOS.vbs  — one-click start
 chronos.py   — server + agent + app window in one process
 chronos.ico  — shortcut icon
+fonts/       — Inter and JetBrains Mono, local (latin + latin-ext, OFL)
 index.html   — structure and dialogs
 styles.css   — design system (tokens, typography, components)
 app.js       — state, measurement, activity log, score, statistics
@@ -426,10 +429,28 @@ Three decisions make it something you can look at all day:
   intersect`) cut a hole for the dial and fade the edges, while the category rail
   and the statistics panel are opaque. What remains is a ring of characters
   around the clock — a background, not wallpaper behind text.
-- **It costs little.** ~18 frames per second instead of 60, on a
-  `requestAnimationFrame` loop, so a minimised window stops it automatically.
+- **It costs little.** ~18 frames per second instead of 60, dropping to ~7
+  when the window loses focus: the rain keeps falling but takes no CPU away
+  from your work. The loop runs on `requestAnimationFrame`, so a minimised
+  window stops it automatically, and the canvas renders at no more than 1.5×
+  pixel density — a mask-dimmed background needs no more.
 - **The motion can be turned off.** `prefers-reduced-motion` leaves a single
   static frame instead of the animation.
 
 Surfaces are green-black rather than neutral black, and that is not decoration:
 a cool grey panel over a warm green rain would look stuck on top of it.
+
+### CPU budget
+
+The app sits on screen all day, so every cycle has to earn its keep:
+
+- the dial arc and digits refresh every 250 ms, but the day panel, the
+  category rail and open statistics are rebuilt **once per second** — they
+  have nothing new to show more often than that,
+- a hidden window paints nothing; only the session-target logic keeps
+  running, so the notification is never lost,
+- the mini overlay compares each frame against a state stamp and returns
+  immediately when nothing changed — a PiP window is never throttled by the
+  browser, so without this it would run the classifier every half second all
+  day long,
+- the character rain slows down without focus (described above).

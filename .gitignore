@@ -1,0 +1,39 @@
+# ══════════════════════════════════════════════════════════════
+#  CHRONOS — co NIE trafia do repozytorium / what stays out of git
+#
+#  Historia czasu nie leży w żadnym pliku projektu — siedzi w localStorage
+#  przeglądarki, wewnątrz .chronos-profile. Ten katalog jest ignorowany,
+#  więc każdy, kto pobierze repozytorium, startuje z pustą, własną bazą,
+#  a Twoje dane nigdy nie wychodzą z tego komputera.
+#
+#  Your tracked time never lives in a project file — it sits in the browser
+#  localStorage inside .chronos-profile, which is ignored here. Everyone who
+#  clones this repo starts with their own empty database, and your history
+#  never leaves your machine.
+# ══════════════════════════════════════════════════════════════
+
+# profil przeglądarki = Twoja baza danych / browser profile = your database
+.chronos-profile/
+
+# eksporty i kopie zapasowe / exports and backups
+chronos-backup-*.json
+chronos-export-*.json
+
+# log startowy / startup log
+chronos.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# narzędzia i system / tooling and OS
+.playwright-mcp/
+node_modules/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -137,9 +137,9 @@ the classifier.
 The order is deliberate and unambiguous:
 
 1. **Your rule** — always first.
-2. **The classifier's verdict**, when it has one. Discord or gameplay on YouTube
-   go to Chill **even inside a manually started "Work" session**. Declaring that
-   you are working does not turn a game into work.
+2. **The classifier's verdict**, when it has one. A game, or gameplay on
+   YouTube, goes to Chill **even inside a manually started "Work" session**.
+   Declaring that you are working does not turn a game into work.
 3. **The running session**, only when the classifier is neutral. File Explorer
    in the middle of work counts as work, because session context is the only
    information available.
@@ -170,13 +170,21 @@ the active tab. `classify.js` reduces it to a clean name: it strips suffixes
 |---|---|
 | YouTube, Twitch, Kick | **recreation** — unless the tab sounds like real research |
 | games: Among Us, CS2, Aim Lab, League of Legends, VALORANT and the rest of the list | **recreation**, always |
-| **Messenger** | **counts neither way** — a conversation is not recreation |
+| **Messenger, Facebook, Discord** | **work** — a contact channel, not browsing |
 | reels, shorts, TikTok | recreation **only past 3 minutes total in a day** |
 
-Messenger is the one service with a hard "neutral" declaration: it adds points
-to neither side and outranks any other signal in the title. Its entry sits
-**before** Facebook in `SITES`, because "Facebook Messenger" contains both words
-and the loop stops at the first hit.
+### Messengers count as work
+
+Messenger, Facebook and Discord count as work, because that is how they are
+actually used here: reaching clients, not wandering. The weight is deliberately
+low (3), so it is a **weak** signal — a genuinely recreational title still beats
+it, since the stronger side wins the sum.
+
+The Messenger entry sits **before** Facebook in `SITES`, because "Facebook
+Messenger" contains both words and the loop stops at the first hit.
+
+> If Facebook is browsing rather than work for you, it is one word in
+> `classify.js`: `k: 'work'` → `k: 'chill'`.
 
 #### The three-minute grace for short formats
 
@@ -203,7 +211,7 @@ wins — which is why YouTube can be either:
 | `shroud playing VALORANT — Twitch` | work 0 : chill 8 | **chill** |
 | `ThePrimeagen — Docker in 10 minutes — Twitch` | work 4 : chill 3 | **work** |
 | `xQc — Kick` | work 0 : chill 3 | **chill** |
-| `(3) Messenger` | declaration | **neutral** |
+| `(3) Messenger` | work 3 : chill 0 | **work** |
 | `New tab` | 0 : 0 | **neutral** |
 
 A game name beats the word "tutorial", and a specific technology beats the mere
@@ -221,29 +229,31 @@ Matching works on **whole words**, not fragments, so `dota` will not fire inside
 another word. For inflected forms, add an asterisk: `'tax*'` catches *tax,
 taxes, taxable* without reaching into the middle of a different word.
 
-### Offline after 15 seconds
+### Offline after 40 seconds
 
-More than **15 s** without mouse or keyboard input switches CHRONOS to offline.
+More than **40 s** without mouse or keyboard input switches CHRONOS to offline.
+Not 15: reading a paragraph, glancing at notes or thinking a sentence through is
+still work, not absence.
 The idle stretch is **cut out of the running session** (subtracted from measured
 time, not merely paused) and measurement resumes by itself when you come back.
 Offline is counted separately and does not affect the score either way.
 
 > Detection is based on mouse and keyboard activity and the lock screen, not on
 > image analysis. A film watched without touching the mouse is treated as
-> offline after 15 s.
+> offline after 40 s.
 
 #### Exception: meetings
 
 In a meeting you listen. The mouse sits still for an hour while you are very
-much there, so those 15 seconds would simply be a measurement error. When
+much there, so those 40 seconds would simply be a measurement error. When
 **Google Meet, Zoom, Slack, Teams, Webex, Whereby or Jitsi** is visible on *any*
-screen, the threshold rises from 15 seconds to **45 minutes**. The Active window
+screen, the threshold rises from 40 seconds to **45 minutes**. The Active window
 strip says so outright: *"Google Meet — listening, idle does not count"*.
 
 The threshold rises rather than disappearing, and that is deliberate: walking
 away from the computer with Meet still open has to reach offline eventually,
 otherwise a forgotten call would add half a day of work. The lock screen skips
-the exception — `lockapp.exe` is not a meeting, so the usual 15 seconds apply.
+the exception — `lockapp.exe` is not a meeting, so the usual 40 seconds apply.
 
 Detection goes by process name (`zoom.exe`, `slack.exe`, `teams.exe`) or by tab
 title. A Meet tab is literally "Meet — meeting-code", which is why the pattern is
@@ -353,6 +363,20 @@ trimmed to 30 days. The statistics window has **Export JSON**, **Import** and
 
 > Clearing site data in the browser wipes the history. Export before doing that.
 
+### Save migrations
+
+Changing the rules must not leave old history contradicting what the app says
+today. So the save carries a migration number (`m`), and each rewrite runs
+**exactly once**, on the first start after an update:
+
+- emoji category logos are converted to the nearest vector icon,
+- Messenger, Facebook and Discord segments previously marked as recreation move
+  to work, together with their assignment to a "work" type category.
+
+Only segments marked as recreation are touched. Anything already work or neutral
+stays as it is, later manual corrections are not undone on the next start, and
+manually saved sessions are not changed at all.
+
 Two safeguards, added after I deleted my own data during testing:
 
 - **A read error never wipes the history.** If a save turns out to be corrupt,
@@ -409,5 +433,3 @@ Three decisions make it something you can look at all day:
 
 Surfaces are green-black rather than neutral black, and that is not decoration:
 a cool grey panel over a warm green rain would look stuck on top of it.
-#   c h r o n o s  
- 

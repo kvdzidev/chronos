@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>CHRONOS — tracker czasu</title>
+<meta name="color-scheme" content="dark" />
+<!-- aplikacja lokalna: zawsze świeże pliki, zero mieszania wersji po edycji -->
+<meta http-equiv="cache-control" content="no-cache" />
+<meta name="theme-color" content="#040806" />
+<!-- fonty leżą lokalnie (fonts/): zero CDN, ten sam wygląd bez internetu -->
+<link rel="stylesheet" href="fonts/fonts.css" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='11' fill='none' stroke='%233ddc84' stroke-width='2.4'/><path d='M16 9.5v7l4.2 2.4' fill='none' stroke='%233ddc84' stroke-width='2.4' stroke-linecap='round'/></svg>" />
+</head>
+<body>
+
+<h1 class="sr-only" data-i18n="app.h1">CHRONOS — tracker czasu i statystyk dziennych</h1>
+
+<div class="ambient" aria-hidden="true">
+  <div class="ambient-grid"></div>
+  <div class="ambient-glow ambient-glow--a"></div>
+  <div class="ambient-glow ambient-glow--b"></div>
+</div>
+
+<div class="app" id="app">
+
+  <!-- LEWA SZYNA: KATEGORIE -->
+  <aside class="rail" data-i18n-attr="aria-label:rail.categories" aria-label="Kategorie">
+    <header class="rail__head">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="26" height="26">
+          <circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="1.25" opacity=".3"/>
+          <circle cx="16" cy="16" r="12.5" fill="none" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-dasharray="20 60" transform="rotate(-90 16 16)"/>
+          <path d="M16 9.5v7l4 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="mark__text">
+        <span class="mark__name" translate="no">CHRONOS</span>
+        <span class="mark__sub" data-i18n="mark.sub">time tracker</span>
+      </div>
+    </header>
+
+    <div class="rail__label">
+      <span data-i18n="rail.categories">Kategorie</span>
+      <span class="rail__count" id="catCount">0</span>
+    </div>
+
+    <p class="cats__empty" id="catEmpty" data-i18n-html="rail.empty" hidden>
+      Brak kategorii.<br />Dodaj pierwszą, aby zacząć mierzyć czas.
+    </p>
+
+    <nav class="cats" id="catList" data-i18n-attr="aria-label:rail.list" aria-label="Lista kategorii"></nav>
+
+    <div class="rail__foot">
+      <button class="btn btn--ghost btn--block" id="addCatBtn">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="rail.new">Nowa kategoria</span>
+        <kbd>N</kbd>
+      </button>
+    </div>
+  </aside>
+
+  <!-- CENTRUM: TIMER -->
+  <main class="stage">
+    <div class="stage__top">
+      <div class="status" id="status" data-state="idle">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text" id="statusText">Gotowy</span>
+      </div>
+      <div class="status status--monitor" id="monitorChip" data-state="off" hidden>
+        <span class="status__dot" aria-hidden="true"></span>
+        <span id="monitorChipText">Monitor</span>
+      </div>
+
+      <button class="btn btn--micro btn--mini" id="miniBtn" title="Mała nakładka zawsze na wierzchu">
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+          <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <rect x="8" y="8" width="5.5" height="4.5" rx="1" fill="currentColor"/>
+        </svg>
+        Mini
+        <kbd>M</kbd>
+      </button>
+
+      <div class="stage__meta">
+        <span id="todayDate">—</span>
+        <span class="sep" aria-hidden="true"></span>
+        <span class="mono" id="wallClock">--:--:--</span>
+      </div>
+    </div>
+
+    <div class="mon" id="monitorStrip" hidden>
+      <span class="mon__label" data-i18n="mon.label">Aktywne okno</span>
+      <span class="mon__app mono" id="monApp">—</span>
+      <span class="mon__title" id="monTitle">—</span>
+      <span class="mon__screens" id="monScreens" hidden></span>
+      <span class="mon__idle" id="monIdle"></span>
+      <span class="mon__arrow" aria-hidden="true">→</span>
+      <span class="mon__match" id="monMatch" data-state="none"></span>
+      <button class="chip chip--auto" type="button" id="autoToggle" aria-pressed="false"
+              data-i18n-attr="title:auto.title"
+              title="Automatyczne przypisanie czasu do kategorii wg reguł okna">AUTO OFF</button>
+    </div>
+
+    <div class="dial-zone">
+      <button class="dial" id="dial" type="button" data-i18n-attr="aria-label:dial.aria" aria-label="Start lub pauza pomiaru czasu">
+        <svg class="dial__svg" viewBox="0 0 360 360" aria-hidden="true">
+          <defs>
+            <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%"  stop-color="var(--dial-c1)" />
+              <stop offset="100%" stop-color="var(--dial-c2)" />
+            </linearGradient>
+            <filter id="arcGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="5" result="b" />
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <g class="dial__deco dial__deco--slow">
+            <circle cx="180" cy="180" r="172" fill="none" stroke="var(--hairline)" stroke-width="1"
+                    stroke-dasharray="1 7" />
+          </g>
+          <g class="dial__deco dial__deco--rev">
+            <circle cx="180" cy="180" r="163" fill="none" stroke="var(--dial-c1)" stroke-width="1"
+                    stroke-dasharray="46 250" stroke-linecap="round" opacity=".45" />
+            <circle cx="180" cy="180" r="163" fill="none" stroke="var(--dial-c1)" stroke-width="1"
+                    stroke-dasharray="14 250" stroke-dashoffset="-140" stroke-linecap="round" opacity=".28" />
+          </g>
+
+          <g id="ticks" class="dial__ticks"></g>
+
+          <circle cx="180" cy="180" r="140" fill="none" stroke="var(--hairline-strong)" stroke-width="2" />
+          <circle id="arc" cx="180" cy="180" r="140" fill="none" stroke="url(#arcGrad)" stroke-width="3.5"
+                  stroke-linecap="round" filter="url(#arcGlow)"
+                  transform="rotate(-90 180 180)" stroke-dasharray="879.646" stroke-dashoffset="879.646" />
+          <circle id="arcHead" class="dial__head" cx="180" cy="40" r="3.5" fill="var(--dial-c2)" opacity="0" />
+        </svg>
+
+        <div class="dial__face">
+          <div class="dial__cat" id="dialCat">
+            <span class="dial__catdot" id="dialCatDot"></span>
+            <span id="dialCatName" data-i18n="dial.pickCat">Wybierz kategorię</span>
+          </div>
+          <div class="dial__time mono" id="timeDisplay">
+            <span id="tH">00</span><i>:</i><span id="tM">00</span><i>:</i><span id="tS">00</span>
+          </div>
+          <div class="dial__hint" id="dialHint" data-i18n="dial.hintStart">Kliknij, aby wystartować</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="stage__bottom">
+      <div class="targets" id="targets" role="group" data-i18n-attr="aria-label:target.aria" aria-label="Cel sesji">
+        <span class="targets__label" data-i18n="target.label">Cel</span>
+        <button class="chip" type="button" data-target="0">∞</button>
+        <button class="chip" type="button" data-target="25">25m</button>
+        <button class="chip" type="button" data-target="50">50m</button>
+        <button class="chip" type="button" data-target="90">90m</button>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn--primary" id="playBtn" disabled>
+          <span class="btn__ico" id="playIcon"></span><span id="playLabel">Start</span><kbd>Space</kbd>
+        </button>
+        <button class="btn btn--ghost" id="stopBtn" disabled>
+          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
+          <span data-i18n="btn.saveSession">Zapisz sesję</span>
+        </button>
+        <button class="btn btn--quiet btn--icon" id="discardBtn" disabled data-i18n-attr="title:btn.discard, aria-label:btn.discard" title="Odrzuć bieżącą sesję" aria-label="Odrzuć bieżącą sesję">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- PRAWY PANEL: DZIEŃ -->
+  <aside class="panel" data-i18n-attr="aria-label:panel.aria" aria-label="Podsumowanie dnia">
+    <div class="panel__head">
+      <span class="eyebrow" data-i18n="panel.today">Dzisiaj</span>
+      <button class="btn btn--micro" id="openStats">
+        <span data-i18n="panel.fullStats">Pełne statystyki</span>
+        <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M5 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="total">
+      <div class="total__value mono" id="dayTotal">0<small>h</small> 00<small>m</small></div>
+      <div class="total__bar" id="dayBar" aria-hidden="true"></div>
+      <div class="total__meta">
+        <span><b id="daySessions">0</b> <span data-i18n="panel.sessions">sesji</span></span>
+        <span><b id="dayLongest">—</b> <span data-i18n="panel.longest">najdłuższa</span></span>
+      </div>
+    </div>
+
+    <div class="panel__label" data-i18n="panel.breakdown">Podział</div>
+    <div class="split" id="splitList"></div>
+    <p class="panel__empty" id="splitEmpty" data-i18n-html="panel.empty">Brak zarejestrowanego czasu.<br />Wystartuj timer, aby zobaczyć rozkład dnia.</p>
+
+    <div class="panel__label panel__label--mt" data-i18n="panel.activity">Aktywność 00–24</div>
+    <div class="strip" id="dayStrip" aria-hidden="true"></div>
+    <div class="strip__axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+
+    <div class="panel__label" id="recentLabel" data-i18n="panel.recent" hidden>Ostatnie sesje</div>
+    <div class="recent" id="recentList"></div>
+  </aside>
+</div>
+
+<!-- MODAL: STATYSTYKI -->
+<div class="overlay" id="statsOverlay" hidden>
+  <div class="sheet sheet--wide" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <header class="sheet__head">
+      <div class="sheet__title">
+        <span class="eyebrow" id="statsKicker" data-i18n="stats.kicker">Raport dzienny</span>
+        <h2 id="statsTitle" data-i18n="stats.title">Statystyki</h2>
+      </div>
+
+      <div class="modes" id="statsModes" role="group" data-i18n-attr="aria-label:stats.range" aria-label="Zakres raportu">
+        <button class="mode" type="button" data-mode="day" data-i18n="stats.day">Dzień</button>
+        <button class="mode" type="button" data-mode="month" data-i18n="stats.month">Miesiąc</button>
+      </div>
+
+      <div class="daynav">
+        <button class="iconbtn" id="prevDay" type="button" data-i18n-attr="aria-label:stats.prevDay" aria-label="Poprzedni dzień"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <span class="daynav__label" id="statsDate">—</span>
+        <button class="iconbtn" id="nextDay" type="button" data-i18n-attr="aria-label:stats.nextDay" aria-label="Następny dzień"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <button class="iconbtn iconbtn--close" id="closeStats" type="button" data-i18n-attr="aria-label:common.close" aria-label="Zamknij"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    </header>
+
+    <div class="sheet__body">
+
+      <!-- ══════ WIDOK MIESIĘCZNY ══════ -->
+      <div id="monthView" hidden>
+        <div class="kpis">
+          <div class="kpi"><span class="kpi__k" data-i18n="kpi.recorded">Zarejestrowany czas</span><span class="kpi__v mono" id="mkTotal">0h</span></div>
+          <div class="kpi"><span class="kpi__k" data-i18n="kpi.work">Praca</span><span class="kpi__v mono" id="mkWork">0h</span></div>
+          <div class="kpi"><span class="kpi__k" data-i18n="kpi.avgScore">Średni ranking</span><span class="kpi__v mono" id="mkScore">0</span></div>
+          <div class="kpi"><span class="kpi__k" data-i18n="kpi.bestDay">Najlepszy dzień</span><span class="kpi__v" id="mkBest">—</span></div>
+        </div>
+
+        <section class="block">
+          <div class="block__row">
+            <h3 class="block__title" data-i18n="cal.title">Kalendarz miesiąca</h3>
+            <span class="block__hint" data-i18n="cal.hint">kliknij dzień, aby wejść w szczegóły</span>
+          </div>
+          <div class="cal__names" aria-hidden="true">
+            <span data-i18n="cal.mon">pon</span><span data-i18n="cal.tue">wt</span><span data-i18n="cal.wed">śr</span><span data-i18n="cal.thu">czw</span>
+            <span data-i18n="cal.fri">pt</span><span data-i18n="cal.sat">sob</span><span data-i18n="cal.sun">ndz</span>
+          </div>
+          <div class="cal" id="calendar"></div>
+          <div class="cal__legend">
+            <span><i style="background:#fb7185"></i>0–24</span>
+            <span><i style="background:#ffb454"></i>25–49</span>
+            <span><i style="background:#3ddc84"></i>50–69</span>
+            <span><i style="background:#a6ffcd"></i>70–100</span>
+            <span class="cal__legend-note" data-i18n="cal.legendNote">kolor = ranking produktywności dnia</span>
+          </div>
+        </section>
+
+        <section class="block">
+          <div class="block__row">
+            <h3 class="block__title" data-i18n="month.split">Podział miesiąca</h3>
+            <span class="block__hint" id="monthDays"></span>
+          </div>
+          <div class="score__mix" id="monthMix" aria-hidden="true"></div>
+          <ul class="legend legend--inline" id="monthMixList"></ul>
+          <div class="split split--month" id="monthSplit"></div>
+        </section>
+
+        <p class="panel__empty" id="monthEmpty" data-i18n="month.empty" hidden>
+          Brak zarejestrowanego czasu w tym miesiącu.
+        </p>
+      </div>
+
+      <!-- ══════ WIDOK DZIENNY ══════ -->
+      <div id="dayView">
+      <div class="kpis">
+        <div class="kpi"><span class="kpi__k" data-i18n="kpi.total">Łączny czas</span><span class="kpi__v mono" id="kTotal">0h 00m</span></div>
+        <div class="kpi"><span class="kpi__k" data-i18n="kpi.sessions">Sesje</span><span class="kpi__v mono" id="kSessions">0</span></div>
+        <div class="kpi"><span class="kpi__k" data-i18n="kpi.avgSession">Średnia sesja</span><span class="kpi__v mono" id="kAvg">0m</span></div>
+        <div class="kpi"><span class="kpi__k" data-i18n="kpi.topCat">Top kategoria</span><span class="kpi__v" id="kTop">—</span></div>
+      </div>
+
+      <section class="score">
+        <div class="score__ring">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--surface-3)" stroke-width="9" />
+            <circle id="scoreRing" cx="60" cy="60" r="52" fill="none" stroke="#3ddc84" stroke-width="9"
+                    stroke-linecap="round" transform="rotate(-90 60 60)"
+                    stroke-dasharray="326.7" stroke-dashoffset="326.7" />
+          </svg>
+          <div class="score__num">
+            <span class="mono" id="scoreValue">0</span>
+            <small>/ 100</small>
+          </div>
+        </div>
+
+        <div class="score__body">
+          <div class="score__head">
+            <div class="score__title">
+              <span class="eyebrow" data-i18n="score.eyebrow">Ranking produktywności</span>
+              <h3 id="scoreLabel">—</h3>
+              <p class="score__src" id="scoreSource"></p>
+            </div>
+            <span class="score__offline" id="offlineNote"></span>
+          </div>
+
+          <div class="score__mix" id="scoreMix" aria-hidden="true"></div>
+          <ul class="legend legend--inline" id="scoreMixList"></ul>
+
+          <div class="comps" id="scoreComps"></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="block__row">
+          <h3 class="block__title" data-i18n="drill.title">Szczegóły kategorii</h3>
+          <span class="block__hint" data-i18n="drill.hint">co, gdzie i ile</span>
+        </div>
+        <div class="dtabs" id="drillTabs" role="group" data-i18n-attr="aria-label:drill.aria" aria-label="Wybór kategorii"></div>
+        <div class="drill" id="drillBody"></div>
+        <p class="panel__empty" id="drillEmpty" data-i18n-html="drill.empty" hidden>
+          Brak danych o oknach. Uruchom <b>agent.cmd</b>, aby CHRONOS widział,
+          w czym faktycznie spędzasz czas.
+        </p>
+      </section>
+
+      <div class="grid2">
+        <section class="block">
+          <h3 class="block__title" data-i18n="split.title">Rozkład czasu</h3>
+          <div class="donutwrap">
+            <svg class="donut" id="donut" viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <div class="donut__center">
+              <span class="mono" id="donutTotal">0h</span>
+              <small data-i18n="split.measured">zmierzone</small>
+            </div>
+          </div>
+          <ul class="legend" id="legend"></ul>
+        </section>
+
+        <section class="block">
+          <h3 class="block__title" data-i18n="hours.title">Aktywność godzinowa</h3>
+          <div class="hours" id="hours" role="img" data-i18n-attr="aria-label:hours.aria" aria-label="Wykres aktywności w godzinach"></div>
+          <div class="hours__axis"><span>00</span><span>04</span><span>08</span><span>12</span><span>16</span><span>20</span><span>24</span></div>
+        </section>
+      </div>
+
+      <section class="block">
+        <div class="block__row">
+          <h3 class="block__title" data-i18n="log.title">Dziennik sesji</h3>
+          <span class="block__hint" id="logCount"></span>
+        </div>
+        <div class="log" id="log"></div>
+        <p class="panel__empty" id="logEmpty" data-i18n="log.empty">Brak sesji tego dnia.</p>
+      </section>
+      </div><!-- /dayView -->
+    </div>
+
+    <footer class="sheet__foot">
+      <div class="sheet__foot-l">
+        <button class="btn btn--quiet btn--sm" id="exportBtn" type="button" data-i18n="foot.export">Eksport JSON</button>
+        <button class="btn btn--quiet btn--sm" id="importBtn" type="button" data-i18n="foot.import">Import</button>
+        <button class="btn btn--quiet btn--sm btn--danger" id="resetBtn" type="button" data-i18n="foot.reset">Wyczyść dane</button>
+        <input type="file" id="importFile" accept="application/json"
+               data-i18n-attr="aria-label:foot.importAria" aria-label="Plik JSON do importu" hidden />
+      </div>
+      <div class="foot-r">
+        <div class="langpick" id="langPick" role="group" data-i18n-attr="aria-label:foot.lang">
+          <button class="langpick__b" type="button" data-lang="pl">PL</button>
+          <button class="langpick__b" type="button" data-lang="en">EN</button>
+        </div>
+        <span class="foot-note" data-i18n="foot.note">Dane zapisywane lokalnie w tej przeglądarce</span>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- MODAL: KATEGORIA -->
+<div class="overlay" id="catOverlay" hidden>
+  <form class="sheet sheet--narrow" id="catForm" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+    <header class="sheet__head">
+      <div class="sheet__title">
+        <span class="eyebrow" data-i18n="cat.setup">Konfiguracja</span>
+        <h2 id="catTitle" data-i18n="cat.new">Nowa kategoria</h2>
+      </div>
+      <button class="iconbtn iconbtn--close" id="closeCat" type="button" data-i18n-attr="aria-label:common.close" aria-label="Zamknij"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    </header>
+
+    <div class="sheet__body">
+      <div class="preview">
+        <div class="preview__logo" id="pvLogo"></div>
+        <div class="preview__txt">
+          <span class="preview__name" id="pvName" data-i18n="cat.previewName">Nazwa kategorii</span>
+          <span class="preview__sub mono" id="pvSub">0h 00m zarejestrowane</span>
+        </div>
+      </div>
+
+      <label class="field">
+        <span class="field__label" data-i18n="cat.nameLabel">Nazwa</span>
+        <input class="input" id="fName" type="text" maxlength="28" data-i18n-attr="placeholder:cat.namePh"
+               placeholder="np. Deep Work" autocomplete="off" required />
+      </label>
+
+      <div class="field">
+        <span class="field__label" data-i18n="cat.color">Kolor akcentu</span>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <div class="field">
+        <span class="field__label" data-i18n="cat.kind">Typ czasu</span>
+        <div class="kinds" id="fKind" role="group" data-i18n-attr="aria-label:cat.kindAria" aria-label="Typ kategorii">
+          <button type="button" class="kind" data-kind="work" data-i18n="kind.work">Praca</button>
+          <button type="button" class="kind" data-kind="chill" data-i18n="seed.chill">Chill</button>
+          <button type="button" class="kind" data-kind="neutral" data-i18n="kind.neutral">Neutralne</button>
+        </div>
+        <span class="hint" data-i18n="cat.kindHint">Decyduje, jak ta kategoria wpływa na ranking produktywności.</span>
+      </div>
+
+      <label class="field">
+        <span class="field__label" data-i18n="cat.rules">Reguły auto-przypisania</span>
+        <input class="input" id="fRules" type="text" placeholder="code.exe, github, figma"
+               autocomplete="off" spellcheck="false" />
+        <span class="hint" data-i18n-html="cat.rulesHint">Fragmenty nazwy procesu lub tytułu okna, po przecinku. Gdy agent
+          jest uruchomiony, a przełącznik <b>AUTO</b> włączony, czas trafia tu automatycznie.</span>
+      </label>
+
+      <div class="field">
+        <span class="field__label" data-i18n="cat.logo">Logo</span>
+        <div class="tabs" id="logoTabs" role="tablist">
+          <button type="button" class="tab" data-tab="mono" role="tab" data-i18n="cat.tabMono">Monogram</button>
+          <button type="button" class="tab" data-tab="icon" role="tab" data-i18n="cat.tabIcon">Ikona</button>
+          <button type="button" class="tab" data-tab="image" role="tab" data-i18n="cat.tabFile">Plik</button>
+        </div>
+
+        <div class="tabpane" data-pane="mono">
+          <p class="hint" data-i18n="cat.monoHint">Dwie pierwsze litery nazwy na tle koloru akcentu.</p>
+        </div>
+
+        <div class="tabpane" data-pane="icon" hidden>
+          <div class="icon-grid" id="iconGrid" role="group"
+               data-i18n-attr="aria-label:cat.iconAria" aria-label="Wybór ikony"></div>
+          <p class="hint" data-i18n="cat.iconHint">Ikona przejmuje kolor akcentu kategorii.</p>
+        </div>
+
+        <div class="tabpane" data-pane="image" hidden>
+          <label class="drop" id="drop">
+            <input type="file" id="fFile" accept="image/*" data-i18n-attr="aria-label:cat.fileAria" aria-label="Plik graficzny logo" hidden />
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span data-i18n-html="cat.drop"><b>Wybierz plik</b> lub upuść tutaj</span>
+            <small data-i18n="cat.dropHint">PNG, JPG, SVG — skalowane do 128 px</small>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <footer class="sheet__foot">
+      <button class="btn btn--quiet btn--sm btn--danger" type="button" id="deleteCat" data-i18n="cat.delete" hidden>Usuń kategorię</button>
+      <div class="sheet__foot-r">
+        <button class="btn btn--ghost btn--sm" type="button" id="cancelCat" data-i18n="common.cancel">Anuluj</button>
+        <button class="btn btn--primary btn--sm" type="submit" id="saveCat" data-i18n="common.save">Zapisz</button>
+      </div>
+    </footer>
+  </form>
+</div>
+
+<!-- MODAL: WYBÓR JĘZYKA (tylko przy pierwszym uruchomieniu) -->
+<div class="overlay overlay--lang" id="langOverlay" hidden>
+  <div class="sheet sheet--narrow lang" role="dialog" aria-modal="true" aria-labelledby="langTitle">
+    <div class="lang__body">
+      <span class="eyebrow" data-i18n="lang.kicker">Wybór języka</span>
+      <h2 id="langTitle" data-i18n="lang.title">Język / Language</h2>
+
+      <div class="lang__opts">
+        <button class="lang__opt" type="button" data-lang="pl">
+          <span class="lang__code">PL</span>
+          <span class="lang__name">Polski</span>
+        </button>
+        <button class="lang__opt" type="button" data-lang="en">
+          <span class="lang__code">EN</span>
+          <span class="lang__name">English</span>
+        </button>
+      </div>
+
+      <p class="lang__note" data-i18n="lang.body">Możesz to zmienić w każdej chwili — na dole okna statystyk.</p>
+      <p class="lang__privacy" data-i18n="lang.privacy">Wszystko zostaje na tym komputerze.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="i18n.js"></script>
+<script src="icons.js"></script>
+<script src="rain.js"></script>
+<script src="classify.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

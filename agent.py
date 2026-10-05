@@ -1,28 +1,7 @@
-"""
-CHRONOS — agent lokalny (Windows)
+"""Agent CHRONOS (Windows): aktywne okno, okno na każdym monitorze i czas
+bezczynności jako JSON pod http://127.0.0.1:8900/now.
 
-Odczytuje AKTYWNE OKNO (tytul + nazwa procesu), okno wiodace na KAZDYM
-monitorze oraz czas bezczynnosci i wystawia to jako JSON pod
-http://127.0.0.1:8900/now
-
-Zakres danych, ktore agent widzi i oddaje:
-  - tytul okna na wierzchu           (np. "app.js - timer - Visual Studio Code")
-  - nazwa pliku wykonywalnego        (np. "Code.exe")
-  - to samo dla kazdego ekranu z osobna (pole "screens")
-  - sekundy od ostatniego ruchu myszy/klawisza
-
-Przy dwoch monitorach jedno okno na wierzchu to za malo: Meet potrafi lecec
-na drugim ekranie, kiedy pracujesz na pierwszym. Dlatego agent oddaje po
-jednym oknie z kazdego monitora - tym, ktore na nim faktycznie widac.
-
-Czego agent NIE robi: nie czyta klawiszy, nie robi zrzutow ekranu, nie zaglada
-do tresci okien, nie zapisuje historii na dysk i nie wysyla niczego do sieci.
-Nasluchuje wylacznie na petli zwrotnej (127.0.0.1), wiec jest widoczny tylko
-z tego komputera. Dziala tak dlugo, jak dlugo to okno konsoli jest otwarte.
-
-Uruchomienie:  agent.cmd   (albo:  python agent.py)
-Zatrzymanie:   Ctrl+C lub zamkniecie okna konsoli
-Wymagania:     Python 3.8+ , wylacznie biblioteka standardowa
+Start: agent.cmd albo python agent.py. Tylko biblioteka standardowa.
 """
 
 import ctypes
@@ -35,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HOST = "127.0.0.1"
 PORT = 8900
 
-# ─────────────────────────── Windows API ───────────────────────────
+# Windows API
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -47,7 +26,7 @@ user32.GetWindowTextLengthW.argtypes = [wt.HWND]
 user32.GetWindowTextW.argtypes = [wt.HWND, wt.LPWSTR, ctypes.c_int]
 user32.GetClassNameW.argtypes = [wt.HWND, wt.LPWSTR, ctypes.c_int]
 user32.GetWindowLongW.restype = wt.LONG
-# UWAGA: bez restype ctypes zwrocilby c_int i uciol uchwyt na 64 bitach
+# bez restype ctypes zwraca c_int i ucina uchwyt na 64 bitach
 user32.MonitorFromWindow.restype = wt.HANDLE
 user32.MonitorFromWindow.argtypes = [wt.HWND, wt.DWORD]
 kernel32.GetTickCount64.restype = ctypes.c_ulonglong
@@ -67,7 +46,7 @@ DWMWA_CLOAKED = 14
 MONITOR_DEFAULTTONEAREST = 2
 MONITORINFOF_PRIMARY = 1
 
-# okna pulpitu i powloki - widoczne zawsze, a nie znacza nic
+# okna pulpitu i powłoki, zawsze widoczne, do pominięcia
 SKIP_CLASSES = frozenset((
     "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
     "Windows.UI.Core.CoreWindow", "ApplicationManager_DesktopShellWindow",
@@ -93,7 +72,7 @@ class MONITORINFO(ctypes.Structure):
     ]
 
 
-# --------------------- pojedyncze okno ---------------------
+# Pojedyncze okno
 
 
 def window_title(hwnd):
@@ -128,8 +107,7 @@ def window_class(hwnd):
 
 
 def window_cloaked(hwnd):
-    """Okno "ukryte" przez DWM: zamkniete aplikacje UWP zostaja widoczne dla
-    IsWindowVisible, choc na ekranie nie ma po nich sladu."""
+    """Cloaked przez DWM, np. zamknięte UWP, które IsWindowVisible nadal zgłasza."""
     if not dwmapi:
         return False
     val = wt.DWORD(0)
@@ -144,21 +122,20 @@ def window_cloaked(hwnd):
 
 
 def foreground_window():
-    """Tytul i proces okna na wierzchu. Puste wartosci, gdy brak dostepu."""
+    """(tytuł, proces) okna na wierzchu; puste, gdy brak dostępu."""
     hwnd = user32.GetForegroundWindow()
     if not hwnd:
         return "", ""
     return window_title(hwnd), window_app(hwnd)
 
 
-# --------------------- monitory ---------------------
+# Monitory
 
 
 def monitor_map():
-    """HMONITOR -> (numer ekranu, czy glowny).
+    """HMONITOR -> (numer ekranu, czy główny).
 
-    Numerujemy od lewej do prawej wedlug polozenia, wiec numer ekranu nie
-    skacze miedzy odpytaniami ani po przelogowaniu."""
+    Numeracja od lewej wg położenia, żeby numery były stabilne."""
     found = []
 
     def cb(hmon, hdc, rect, lparam):
@@ -182,10 +159,10 @@ def monitor_map():
 
 
 def screens(limit=6):
-    """Po jednym oknie z kazdego monitora - tym, ktore na nim widac.
+    """Po jednym widocznym oknie z każdego monitora.
 
-    EnumWindows chodzi po oknach w kolejnosci Z, od wierzchu w dol, wiec
-    pierwsze przyjete okno przypisane do danego ekranu jest tym wiodacym."""
+    EnumWindows idzie w kolejności Z od góry, więc pierwsze pasujące okno
+    na danym ekranie jest tym na wierzchu."""
     fg = int(user32.GetForegroundWindow() or 0)
     mons = monitor_map()
     total = max(1, len(mons))
@@ -194,7 +171,7 @@ def screens(limit=6):
 
     def cb(hwnd, lparam):
         if len(out) >= min(total, limit):
-            return False                       # mamy komplet - dosc chodzenia
+            return False                       # komplet, koniec
         if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
             return True
         if user32.GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW:
@@ -209,7 +186,7 @@ def screens(limit=6):
         rect = wt.RECT()
         if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
             return True
-        # paski, wysepki i inne drobiazgi to nie jest "to, co widac na ekranie"
+        # pomijamy paski i małe okienka
         if (rect.right - rect.left) < 260 or (rect.bottom - rect.top) < 180:
             return True
 
@@ -238,7 +215,7 @@ def screens(limit=6):
 
 
 def idle_seconds():
-    """Sekundy od ostatniej aktywnosci myszy lub klawiatury."""
+    """Sekundy od ostatniej aktywności myszy lub klawiatury."""
     info = LASTINPUTINFO()
     info.cbSize = ctypes.sizeof(LASTINPUTINFO)
     if not user32.GetLastInputInfo(ctypes.byref(info)):
@@ -246,7 +223,7 @@ def idle_seconds():
     return max(0.0, (kernel32.GetTickCount64() - info.dwTime) / 1000.0)
 
 
-# ─────────────────────────── serwer HTTP ───────────────────────────
+# Serwer HTTP
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -257,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        # tylko odczyt, tylko petla zwrotna — pozwalamy stronie CHRONOS pytac
+        # tylko odczyt i tylko 127.0.0.1, więc CORS dla wszystkich jest ok
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -293,7 +270,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, fmt, *args):
-        pass  # cisza — jedno zapytanie na sekunde zalaloby konsole
+        pass  # zapytanie co sekundę zaśmiecałoby konsolę
 
 
 def main():
@@ -315,8 +292,8 @@ def main():
 
     title, app = foreground_window()
     print("")
-    print("  CHRONOS — agent lokalny")
-    print("  ----------------------------------------------")
+    print("  CHRONOS - agent lokalny")
+    print("  " + "=" * 46)
     print("  Nasluch  : http://%s:%d/now" % (HOST, PORT))
     print("  Widzi    : okno wiodace KAZDEGO monitora, nazwe procesu, bezczynnosc")
     print("  Monitory : %d" % max(1, len(monitor_map())))

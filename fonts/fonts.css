@@ -1,10 +1,5 @@
-/* ══════════════════════════════════════════════════════════════
-   CHRONOS — fonty lokalne (Inter + JetBrains Mono, latin + latin-ext)
-
-   Pliki lezą obok, w tym katalogu. Zadnego CDN: aplikacja lokalna ma
-   wygladac tak samo bez internetu, a start nie moze czekac na Google.
-   Wygenerowane z Google Fonts (licencje: OFL — Inter i JetBrains Mono).
-   ══════════════════════════════════════════════════════════════ */
+/* Inter + JetBrains Mono lokalnie, bez CDN (działa offline).
+   Wygenerowane z Google Fonts, licencja OFL. */
 
 /* latin-ext */
 @font-face {

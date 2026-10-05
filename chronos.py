@@ -1,22 +1,12 @@
-"""
-CHRONOS — jeden proces, cala aplikacja.
+"""CHRONOS: serwer plików, /agent/now i okno aplikacji w jednym procesie.
 
-Robi trzy rzeczy naraz:
-  1. serwuje pliki aplikacji na http://127.0.0.1:8899
-  2. wystawia pod /agent/now aktywne okno i czas bezczynnosci
-  3. otwiera okno aplikacji (przegladarka w trybie --app: bez kart i paska adresu)
-
-Zamkniecie okna aplikacji konczy caly proces — nie zostaje nic w tle.
-
-Wlasny katalog profilu (.chronos-profile) sprawia, ze:
-  - okno jest osobna instancja, wiec jego zamkniecie da sie wykryc,
-  - dane aplikacji sa trwale i niezalezne od Twojej codziennej przegladarki.
-
-Uruchamiane przez CHRONOS.vbs (cicho) albo recznie:  python chronos.py
+Start: python chronos.py (albo CHRONOS.vbs, bez konsoli).
 """
 
+import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -26,11 +16,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 HOST = "127.0.0.1"
 PORT = 8899
 HERE = os.path.dirname(os.path.abspath(__file__))
+# osobny profil, żeby okno było osobną instancją i dało się złapać jego zamknięcie
 PROFILE = os.path.join(HERE, ".chronos-profile")
 LOG = os.path.join(HERE, "chronos.log")
 URL = "http://%s:%d/index.html" % (HOST, PORT)
 
-# odczyt aktywnego okna zyje w agent.py — tu tylko go uzywamy
+# odczyt aktywnego okna jest w agent.py
 try:
     import agent as winagent
 except Exception:
@@ -47,7 +38,7 @@ def log(msg):
         pass
 
 
-# ─────────────────────────── serwer ───────────────────────────
+# Serwer
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -59,7 +50,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.end_headers()          # Cache-Control dokladany nizej, dla wszystkiego
+        self.end_headers()          # Cache-Control dokłada end_headers() niżej
         self.wfile.write(body)
 
     def do_GET(self):
@@ -72,8 +63,8 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 title, app = winagent.foreground_window()
                 try:
-                    # po jednym oknie z kazdego monitora - Meet potrafi lecec
-                    # na drugim ekranie, kiedy pracujesz na pierwszym
+                    # po jednym oknie z każdego monitora, bo np. Meet bywa
+                    # na drugim ekranie
                     shots = winagent.screens()
                 except Exception:
                     shots = []
@@ -95,7 +86,7 @@ class Handler(SimpleHTTPRequestHandler):
         SimpleHTTPRequestHandler.do_GET(self)
 
     def end_headers(self):
-        # aplikacja lokalna: zawsze swieze pliki, zero mieszania wersji
+        # bez cache, żeby po zmianie plików nie mieszały się wersje
         self.send_header("Cache-Control", "no-store, must-revalidate")
         SimpleHTTPRequestHandler.end_headers(self)
 
@@ -103,7 +94,7 @@ class Handler(SimpleHTTPRequestHandler):
         pass
 
 
-# ─────────────────────────── przegladarka ───────────────────────────
+# Przeglądarka
 
 BROWSERS = [
     ("Chrome", [
@@ -126,6 +117,20 @@ BROWSERS = [
     ("Vivaldi", [
         r"%LocalAppData%\Vivaldi\Application\vivaldi.exe",
     ]),
+    # macOS
+    ("Chrome", ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]),
+    ("Edge", ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]),
+    ("Brave", ["/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"]),
+]
+
+# Linux i reszta: szukane w PATH
+BROWSER_COMMANDS = [
+    ("Chrome", "google-chrome"),
+    ("Chrome", "google-chrome-stable"),
+    ("Chromium", "chromium"),
+    ("Chromium", "chromium-browser"),
+    ("Edge", "microsoft-edge"),
+    ("Brave", "brave-browser"),
 ]
 
 
@@ -135,6 +140,10 @@ def find_browser():
             path = os.path.expandvars(raw)
             if os.path.isfile(path):
                 return name, path
+    for name, cmd in BROWSER_COMMANDS:
+        path = shutil.which(cmd)
+        if path:
+            return name, path
     return None, None
 
 
@@ -142,7 +151,7 @@ def launch_window():
     """Otwiera okno aplikacji i zwraca proces (albo None)."""
     name, exe = find_browser()
     if not exe:
-        log("Nie znaleziono przegladarki na Chromium — otwieram domyslna.")
+        log("Nie znaleziono przegladarki na Chromium - otwieram domyslna.")
         import webbrowser
         webbrowser.open(URL)
         return None
@@ -154,8 +163,7 @@ def launch_window():
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-features=Translate,MediaRouter",
-        # caly ekran od startu; rozmiar nizej to tylko zapas na wypadek,
-        # gdyby przegladarka zignorowala maksymalizacje
+        # window-size na wypadek, gdyby przeglądarka zignorowała --start-maximized
         "--start-maximized",
         "--window-size=1280,860",
     ]
@@ -163,36 +171,51 @@ def launch_window():
     return subprocess.Popen(args)
 
 
-# ─────────────────────────── start ───────────────────────────
+# Start
 
 
-def main():
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        prog="chronos.py",
+        description="CHRONOS: local server, window agent and app window in one process.",
+    )
+    parser.add_argument(
+        "--no-window", action="store_true",
+        help="serve the app only, do not open a browser window "
+             "(open %s yourself)" % URL,
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
+    args = parse_args(argv)
     os.chdir(HERE)
 
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError as err:
-        log("Port %d zajety (%s) — CHRONOS juz dziala. Otwieram istniejace okno." % (PORT, err))
-        launch_window()
+        log("Port %d zajety (%s) - CHRONOS juz dziala. Otwieram istniejace okno." % (PORT, err))
+        if not args.no_window:
+            launch_window()
         return 0
 
     threading.Thread(target=server.serve_forever, daemon=True).start()
     log("Serwer: %s" % URL)
     log("Agent: %s" % ("aktywny" if winagent else "NIEDOSTEPNY (agent.py nie wczytany)"))
 
-    proc = launch_window()
+    proc = None if args.no_window else launch_window()
 
     try:
         if proc is not None:
-            proc.wait()          # zamkniecie okna aplikacji konczy program
-            log("Okno zamkniete — koncze.")
+            proc.wait()          # zamknięcie okna kończy program
+            log("Okno zamkniete - koncze.")
         else:
-            # brak wlasnego okna: dzialamy, dopoki uzytkownik nie zamknie konsoli
+            # bez okna: do Ctrl+C albo zamknięcia konsoli
             while True:
                 time.sleep(3600)
     except KeyboardInterrupt:

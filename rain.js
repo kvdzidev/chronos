@@ -1,22 +1,8 @@
-/* ══════════════════════════════════════════════════════════════
-   CHRONOS — deszcz znaków (tło aplikacji i nakładki)
-
-   Ściana kanji spadająca w ciemności: czoło każdej strugi prawie białe,
-   ogon gaśnie w jadeicie. Jeden moduł obsługuje duże okno i mini-nakładkę,
-   bo okno PiP ma własny `document` i musi dostać własne płótno.
-
-   Trzy rzeczy, które trzymają to w ryzach na cały dzień pracy:
-     • rysujemy ~18 klatek na sekundę, nie 60 — deszcz i tak jest powolny,
-       a procesor zostaje wolny dla reszty aplikacji,
-     • pętla stoi na requestAnimationFrame, więc przy zminimalizowanym
-       oknie przeglądarka zatrzymuje ją sama, bez naszego kodu,
-     • `prefers-reduced-motion` wyłącza ruch: zostaje jedna, statyczna klatka.
-   ══════════════════════════════════════════════════════════════ */
+// CHRONOS - deszcz znaków w tle okna głównego i nakładki PiP.
+// PiP ma własny document, więc każde okno dostaje osobne płótno przez mount().
 (function (global) {
   'use strict';
 
-  /* Znaki dobrane tak, żeby gęstość kresek była w miarę równa — mieszanka
-     liczebników, żywiołów i pojęć. Bez znaczenia semantycznego, to faktura. */
   var GLYPHS = (
     '零壱弐参肆伍陸漆捌玖拾百千万億兆' +
     '時分秒日月火水木金土年' +
@@ -24,28 +10,22 @@
     '刃剣龍鬼神電子流円方京動森田刻'
   ).split('');
 
-  /* Paleta deszczu. Celowo tutaj, a nie w CSS: okno PiP dostaje arkusz
-     asynchronicznie, więc odczyt zmiennych CSS w chwili startu bywa pusty. */
+  // Kolory w JS, nie w CSS: PiP ładuje arkusz asynchronicznie i zmienne
+  // CSS przy starcie bywają puste.
   var C = {
-    back: '#040806',                 // musi być nieprzezroczysty — na nim gaśnie ogon
-    fade: 'rgba(4, 8, 6, 0.085)',    // im mniej, tym dłuższe smugi
+    back: '#040806',
+    fade: 'rgba(4, 8, 6, 0.085)',    // mniej = dłuższe smugi
     head: '#e4fff0',
     body: '#2fbf6d'
   };
 
-  var STEP = 55;          // ms między klatkami (~18 fps), gdy okno ma fokus;
-                          // bez fokusu mnożnik 2.5 daje ~7 fps — deszcz dalej
-                          // pada, ale nie bierze procesora spod pracy
+  var STEP = 55;          // ms między klatkami: ~18 fps z fokusem, ~7 fps bez (x2.5)
   var FONT = '"MS Gothic", "Yu Gothic", Meiryo, "Malgun Gothic", monospace';
 
   function rand(a, b) { return a + Math.random() * (b - a); }
   function pick() { return GLYPHS[(Math.random() * GLYPHS.length) | 0]; }
 
-  /**
-   * @param {Window} win  okno, w którym ma padać (główne albo PiP)
-   * @param {{into?:Element, size?:number, opacity?:number}} opts
-   * @returns {{stop:function}|null}
-   */
+  // win: okno główne albo PiP; opts: { into, size, opacity, step }
   function mount(win, opts) {
     opts = opts || {};
     var doc = win.document;
@@ -73,8 +53,7 @@
 
     function column(i) {
       y[i] = rand(-h / size - 6, 0);
-      /* Prędkość zawsze ≤ 1 wiersza na klatkę. Powyżej strugi zaczęłyby
-         przeskakiwać wiersze i zostawiać dziury w smudze. */
+      // max 1 wiersz na klatkę, szybciej struga przeskakuje wiersze i robi dziury
       sp[i] = rand(0.34, 1);
       glow[i] = Math.random() < 0.2 ? 1 : rand(0.3, 0.72);
       glyph[i] = pick();
@@ -104,8 +83,7 @@
       return true;
     }
 
-    /* Jedna klatka: przygaszamy całość (to robi smugę), a potem dla każdej
-       kolumny przemalowujemy poprzednie czoło na zielono i stawiamy nowe. */
+    // przygaszenie całości robi smugę; stare czoło przemalowane na zielono
     function frame() {
       ctx.fillStyle = C.fade;
       ctx.fillRect(0, 0, w, h);
@@ -130,14 +108,13 @@
           }
         }
 
-        // koniec ekranu: struga wraca na górę, ale nie wszystkie naraz —
-        // losowe opóźnienie rozbija rytm, inaczej deszcz zacząłby pulsować
+        // losowe opóźnienie powrotu na górę, inaczej deszcz pulsuje
         if (row * size > h && Math.random() > 0.972) column(i);
       }
       ctx.globalAlpha = 1;
     }
 
-    // jedna statyczna klatka — dla `prefers-reduced-motion`
+    // prefers-reduced-motion: jedna statyczna klatka
     function still() {
       ctx.font = size + 'px ' + FONT;
       ctx.fillStyle = C.body;
@@ -155,8 +132,7 @@
     function loop(ts) {
       if (dead) return;
       raf = win.requestAnimationFrame(loop);
-      // bez fokusu klatki lecą rzadziej — reszta ciągnie rAF, który przy
-      // zminimalizowanym oknie i tak staje sam
+      // bez fokusu rzadziej; zminimalizowane okno i tak zatrzymuje rAF
       if (ts - lastT < (focused ? step : step * 2.5)) return;
       lastT = ts;
       frame();

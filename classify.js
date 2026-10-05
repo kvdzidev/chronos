@@ -1,23 +1,7 @@
-/* ══════════════════════════════════════════════════════════════
-   CHRONOS — klasyfikator aktywności
-
-   Zamienia surowe "chrome.exe" + "(2) React useEffect - YouTube - Google
-   Chrome" na sensowną informację: jaka aplikacja, jaka karta, jaki serwis
-   i czy to praca, czy chill.
-
-   Zasada: nic nie decyduje pojedyncza reguła. Sygnały sumują się w dwa
-   wyniki (praca / chill) i wygrywa mocniejszy. Dzięki temu:
-     "React tutorial - YouTube"      → PRACA   (react 3 + tutorial 2 > youtube 2)
-     "Minecraft speedrun - YouTube"  → CHILL   (youtube 2 + minecraft 5 > 0)
-     "Excel formuły kurs - YouTube"  → PRACA   (excel 3 + kurs 2 > youtube 2)
-
-   Listy niżej są celowo zwykłymi tablicami — dopisanie własnej strony,
-   gry czy programu to jedna linia.
-   ══════════════════════════════════════════════════════════════ */
+// CHRONOS - klasyfikator aktywności: aplikacja, karta, serwis i praca/chill.
+// Sygnały z list sumują się w dwa wyniki (praca, chill), wygrywa wyższy.
 (function (global) {
   'use strict';
-
-  /* ─────────────── przeglądarki: jak obciąć sufiks tytułu ─────────────── */
 
   var BROWSERS = [
     { exe: 'chrome.exe',    name: 'Chrome' },
@@ -35,21 +19,18 @@
 
   // sufiksy doklejane przez przeglądarki do tytułu karty
   var BROWSER_SUFFIX = new RegExp(
-    '\\s*[-—–|]\\s*(' +
+    '\\s*[-\u2014\u2013|]\\s*(' +
     'Google Chrome|Chrome|Microsoft\\s*Edge|Mozilla Firefox|Firefox|' +
     'Brave|Opera GX|Opera|Vivaldi|Arc|Zen Browser|LibreWolf|Internet Explorer' +
     ')\\s*$', 'i'
   );
-  var EDGE_PROFILE = /\s*[-—–]\s*(Osobiste|Personal|Praca|Work|Profil\s*\d+|Profile\s*\d+)\s*$/i;
+  var EDGE_PROFILE = /\s*[-\u2014\u2013]\s*(Osobiste|Personal|Praca|Work|Profil\s*\d+|Profile\s*\d+)\s*$/i;
   var MORE_PAGES = /\s+(and|i)\s+\d+\s+(more pages?|innych stron|inne strony)\s*$/i;
   var NOTIF_COUNT = /^\s*\(\d+\+?\)\s*/;
-  var AUDIO_MARK = /^\s*[▶🔊🔇]\s*/;
+  var AUDIO_MARK = /^\s*(?:\u25B6|\uD83D\uDD0A|\uD83D\uDD07)\uFE0F?\s*/;
 
-  /* ─────────────── aplikacje ─────────────── */
-  /* waga 5-6 = sygnał mocny, przebija wszystko z tytułu */
-
+  // w = waga sygnału; 5-6 przebija wszystko, co da się wyczytać z tytułu
   var APPS = [
-    // programowanie i narzędzia
     { m: 'code.exe',       n: 'Visual Studio Code', k: 'work',  w: 6 },
     { m: 'code - insiders', n: 'VS Code Insiders',  k: 'work',  w: 6 },
     { m: 'cursor.exe',     n: 'Cursor',             k: 'work',  w: 6 },
@@ -71,7 +52,6 @@
     { m: 'githubdesktop',  n: 'GitHub Desktop',     k: 'work',  w: 6 },
     { m: 'sourcetree',     n: 'Sourcetree',         k: 'work',  w: 6 },
 
-    // biuro i dokumenty
     { m: 'winword.exe',    n: 'Word',               k: 'work',  w: 5 },
     { m: 'excel.exe',      n: 'Excel',              k: 'work',  w: 5 },
     { m: 'powerpnt.exe',   n: 'PowerPoint',         k: 'work',  w: 5 },
@@ -84,7 +64,6 @@
     { m: 'obsidian.exe',   n: 'Obsidian',           k: 'work',  w: 5 },
     { m: 'todoist',        n: 'Todoist',            k: 'work',  w: 4 },
 
-    // komunikacja (praca, ale słabszy sygnał)
     { m: 'teams.exe',      n: 'Microsoft Teams',    k: 'work',  w: 4 },
     { m: 'ms-teams.exe',   n: 'Microsoft Teams',    k: 'work',  w: 4 },
     { m: 'slack.exe',      n: 'Slack',              k: 'work',  w: 4 },
@@ -92,7 +71,6 @@
     { m: 'webex',          n: 'Webex',              k: 'work',  w: 4 },
     { m: 'thunderbird',    n: 'Thunderbird',        k: 'work',  w: 4 },
 
-    // projektowanie i wideo
     { m: 'figma.exe',      n: 'Figma',              k: 'work',  w: 6 },
     { m: 'photoshop.exe',  n: 'Photoshop',          k: 'work',  w: 5 },
     { m: 'illustrator.exe', n: 'Illustrator',       k: 'work',  w: 5 },
@@ -104,7 +82,6 @@
     { m: 'unrealeditor',   n: 'Unreal Editor',      k: 'work',  w: 5 },
     { m: 'obs64.exe',      n: 'OBS Studio',         k: 'work',  w: 4 },
 
-    // rozrywka
     { m: 'steam.exe',          n: 'Steam',            k: 'chill', w: 6 },
     { m: 'steamwebhelper',     n: 'Steam',            k: 'chill', w: 6 },
     { m: 'epicgameslauncher',  n: 'Epic Games',       k: 'chill', w: 6 },
@@ -132,7 +109,7 @@
     { m: 'telegram.exe',       n: 'Telegram',         k: 'chill', w: 3 },
     { m: 'whatsapp.exe',       n: 'WhatsApp',         k: 'chill', w: 3 },
 
-    // neutralne — system, nie liczymy tego ani na plus, ani na minus
+    // system - nie liczy się ani do pracy, ani do chillu
     { m: 'explorer.exe',       n: 'Eksplorator plików', k: 'neutral', w: 3 },
     { m: 'searchhost',         n: 'Wyszukiwanie',       k: 'neutral', w: 3 },
     { m: 'systemsettings',     n: 'Ustawienia',         k: 'neutral', w: 3 },
@@ -142,11 +119,8 @@
     { m: 'applicationframehost', n: 'Aplikacja',        k: 'neutral', w: 1 }
   ];
 
-  /* ─────────────── serwisy w przeglądarce ─────────────── */
-  /* w = jak mocny to sygnał. YouTube celowo słaby (2) — bywa i pracą, i chillem */
-
+  // Serwisy, dopasowywane tylko po tytule karty. Pierwsze trafienie wygrywa.
   var SITES = [
-    // praca / narzędzia
     { m: ['github'],                    n: 'GitHub',          k: 'work',  w: 5 },
     { m: ['gitlab'],                    n: 'GitLab',          k: 'work',  w: 5 },
     { m: ['stack overflow', 'stackoverflow'], n: 'Stack Overflow', k: 'work', w: 5 },
@@ -165,13 +139,12 @@
     { m: ['gmail', 'poczta'],           n: 'Poczta',          k: 'work',  w: 3 },
     { m: ['outlook'],                   n: 'Outlook',         k: 'work',  w: 3 },
     { m: ['overleaf'],                  n: 'Overleaf',        k: 'work',  w: 5 },
-    // spotkania online — wyszly z prawdziwego uzycia, wczesniej bez sygnalu
-    { m: ['meet.google', 'google meet', /^meet\s*($|[—–|-])/], n: 'Google Meet', k: 'work', w: 5 },
-    { m: ['zoom.us', 'zoom meeting', /^zoom\s*($|[—–|-])/],
+    { m: ['meet.google', 'google meet', /^meet\s*($|[\u2014\u2013|-])/], n: 'Google Meet', k: 'work', w: 5 },
+    { m: ['zoom.us', 'zoom meeting', /^zoom\s*($|[\u2014\u2013|-])/],
                                         n: 'Zoom',            k: 'work',  w: 5 },
     { m: ['teams.microsoft', 'microsoft teams'], n: 'Teams',   k: 'work',  w: 5 },
     { m: ['whereby', 'jitsi', 'webex'], n: 'Wideokonferencja', k: 'work',  w: 5 },
-    { m: ['slack.com', /^slack\s*($|[—–|-])/, /[—–|-]\s*slack\s*$/],
+    { m: ['slack.com', /^slack\s*($|[\u2014\u2013|-])/, /[\u2014\u2013|-]\s*slack\s*$/],
                                         n: 'Slack',           k: 'work',  w: 4 },
     { m: ['chatgpt', 'openai'],         n: 'ChatGPT',         k: 'work',  w: 3 },
     { m: ['claude.ai', 'claude'],       n: 'Claude',          k: 'work',  w: 3 },
@@ -190,9 +163,7 @@
     { m: ['linkedin'],                  n: 'LinkedIn',        k: 'work',  w: 3 },
     { m: ['pracuj.pl', 'nofluffjobs', 'justjoin'], n: 'Oferty pracy', k: 'work', w: 4 },
 
-    // rozrywka
-    // YouTube celowo slaby (2): dopiero konkretny temat z WORK_WORDS przewazy
-    // go na prace. Samo "tutorial" nie wystarcza — patrz nizej.
+    // YouTube słaby (2), bo bywa i pracą, i chillem - rozstrzyga temat z tytułu
     { m: ['youtube'],                   n: 'YouTube',         k: 'chill', w: 2 },
     { m: ['twitch'],                    n: 'Twitch',          k: 'chill', w: 3 },
     { m: ['kick.com', '- kick', '| kick'], n: 'Kick',         k: 'chill', w: 3 },
@@ -201,16 +172,11 @@
     { m: ['disney+', 'disneyplus'],     n: 'Disney+',         k: 'chill', w: 6 },
     { m: ['player.pl', 'cda.pl', 'vod.pl'], n: 'VOD',         k: 'chill', w: 6 },
     { m: ['filmweb', 'imdb'],           n: 'Filmweb / IMDb',  k: 'chill', w: 4 },
-    /* Komunikatory to u tego uzytkownika kanal kontaktu z klientem, a nie
-       rozrywka — stad 'work'. Waga celowo niska (3): to slaby sygnal, wiec
-       konkretny tytul rozrywkowy nadal go przebije. Messenger musi stac
-       PRZED Facebookiem, bo "Facebook Messenger" zawiera oba slowa,
-       a petla nizej konczy sie na pierwszym trafieniu. */
+    // Komunikatory to kontakt z klientem/zespołem, więc 'work', ale ze słabą wagą.
+    // Messenger musi być przed Facebookiem - "Facebook Messenger" pasuje do obu.
     { m: ['messenger'],                 n: 'Messenger',       k: 'work',  w: 3 },
     { m: ['discord'],                   n: 'Discord',         k: 'work',  w: 3 },
-    /* short: true = krotki format. Rolka bywa tez skutkiem szukania czegos
-       do pracy, wiec liczy sie dopiero po przekroczeniu dziennego progu
-       (SHORT_GRACE w app.js) — sam klasyfikator tylko to oznacza. */
+    // short: krótki format, liczony dopiero po dziennym progu (SHORT_GRACE w app.js)
     { m: ['tiktok'],                    n: 'TikTok',          k: 'chill', w: 6, short: true },
     { m: ['instagram'],                 n: 'Instagram',       k: 'chill', w: 5, short: true },
     { m: ['facebook'],                  n: 'Facebook',        k: 'work',  w: 3 },
@@ -227,15 +193,10 @@
     { m: ['flashscore', 'sport.pl', 'przegladsportowy'], n: 'Sport', k: 'chill', w: 4 }
   ];
 
-  /* ─────────────── słowa kluczowe w tytule ─────────────── */
-
-  // sygnały, że to jednak research do pracy (nawet na YouTube)
   var WORK_WORDS = [
-    // profesjonalny kontekst — samo w sobie znaczy "praca"
     { m: ['dokumentacj*', 'documentation', ' docs', 'webinar*', 'konferencj*',
           'wykład*', 'lecture', 'szkoleni*', 'certyfikat*', 'onboarding'], w: 3 },
-    // instruktaż jest generyczny: "jak zrobić naleśniki" to nie praca.
-    // Wzmacnia temat, ale sam nie przeważa.
+    // sam instruktaż to jeszcze nie praca ("jak zrobić naleśniki"), tylko wzmacnia temat
     { m: ['tutorial', 'kurs', 'kursy', 'course', 'poradnik*', 'jak zrobić', 'how to',
           'crash course', 'deep dive', 'explained'], w: 1 },
     { m: ['javascript', 'typescript', 'python', 'java ', 'c++', 'c#', 'rust ',
@@ -252,7 +213,6 @@
           'spotkani*', 'meeting', 'deadline'], w: 2 }
   ];
 
-  // sygnały rozrywki — gry i "głupotki" biją research
   var CHILL_WORDS = [
     { m: ['minecraft', 'fortnite', 'valorant', 'league of legends', ' lol ',
           'counter-strike', 'cs2', 'cs:go', 'gta', 'fifa', 'ea fc',
@@ -271,11 +231,8 @@
     { m: ['mecz*', 'transmisj*', 'liga mistrzów', 'ekstraklasa', 'nba', 'ufc'], w: 4 }
   ];
 
-  /* ─────────────── spotkania online ───────────────
-     Osobna lista, bo spotkanie rzadzi sie inna zasada niz reszta: podczas
-     rozmowy zwykle sie SLUCHA. Mysz stoi, klawiatura milczy, a Ty jestes.
-     app.js czyta to i nie wysyla Cie w takiej chwili na offline. */
-
+  // Spotkania: w trakcie rozmowy nie ma ruchu myszy ani klawiatury,
+  // więc app.js nie przełącza wtedy na offline.
   var MEETING_APPS = [
     { m: 'zoom.exe',     n: 'Zoom' },
     { m: 'cpthost.exe',  n: 'Zoom' },          // okno samego spotkania Zoom
@@ -286,29 +243,21 @@
   ];
 
   var MEETING_SITES = [
-    { m: ['meet.google', 'google meet', /^meet\s*($|[—–|-])/], n: 'Google Meet' },
-    { m: ['zoom.us', 'zoom meeting', 'zoom workplace', /^zoom\s*($|[—–|-])/], n: 'Zoom' },
+    { m: ['meet.google', 'google meet', /^meet\s*($|[\u2014\u2013|-])/], n: 'Google Meet' },
+    { m: ['zoom.us', 'zoom meeting', 'zoom workplace', /^zoom\s*($|[\u2014\u2013|-])/], n: 'Zoom' },
     { m: ['teams.microsoft', 'microsoft teams'],         n: 'Microsoft Teams' },
     { m: ['whereby', 'jitsi', 'webex', 'discord.com/channels'], n: 'Wideokonferencja' },
-    { m: ['slack.com', /^slack\s*($|[—–|-])/, /[—–|-]\s*slack\s*$/], n: 'Slack' }
+    { m: ['slack.com', /^slack\s*($|[\u2014\u2013|-])/, /[\u2014\u2013|-]\s*slack\s*$/], n: 'Slack' }
   ];
 
-  /* ─────────────── krotkie formaty ───────────────
-     Rolka albo short bywa tez zwyklym szukaniem czegos do pracy. Tutaj
-     tylko je ZNACZYMY; o tym, czy sie licza, decyduje dzienny prog w app.js. */
-
   var SHORT_WORDS = ['#shorts', 'shorts', 'reels', 'rolki', 'rolka', 'youtube shorts'];
-
-  /* ─────────────── logika ─────────────── */
 
   function norm(s) {
     return String(s || '').replace(/\u200B/g, '').replace(/\s+/g, ' ').trim();
   }
 
-  /* Dopasowanie po CALYCH wyrazach, nie po fragmentach.
-     Bez tego 'dota' lapie sie w "dotacja", a 'mem' w "pamiec".
-     Wzorce ze znakami specjalnymi ('c++', 'cs:go', 'wp.pl') zostaja
-     przy zwyklym szukaniu fragmentu — tam granice wyrazu nie maja sensu. */
+  // Dopasowanie po całych wyrazach, żeby 'dota' nie łapało się w "dotacja".
+  // Wzorce ze znakami specjalnymi ('c++', 'cs:go', 'wp.pl') szukane jako fragment.
   var WORDS_ONLY = /^[a-z0-9ąćęłńóśźż ]+$/;
 
   function makeHay(text) {
@@ -318,16 +267,14 @@
   }
 
   function hasSignal(hay, pattern) {
-    /* Wyrazenie regularne — gdy liczy sie ksztalt calego tytulu, a nie samo
-       wystapienie slowa. Karta Google Meet to doslownie "Meet — kod-spotkania",
-       a zwykle 'meet' zlapaloby tez "Meet the team". */
+    // Regex, gdy liczy się kształt tytułu: karta Meet to "Meet - kod-spotkania",
+    // a samo 'meet' złapałoby też "Meet the team".
     if (pattern instanceof RegExp) return pattern.test(hay.raw);
 
     var p = String(pattern).toLowerCase().trim();
     if (!p) return false;
 
-    // 'podatk*' = wyraz zaczynajacy sie od rdzenia — polska odmiana bez
-    // ryzyka, ze 'dota' zlapie sie w srodku "dotacji"
+    // 'podatk*' = wyraz zaczynający się od rdzenia (odmiana), nie środek wyrazu
     if (p.charAt(p.length - 1) === '*') {
       var stem = p.slice(0, -1).trim();
       return stem.length > 2 && hay.words.indexOf(' ' + stem) !== -1;
@@ -345,7 +292,6 @@
     return null;
   }
 
-  /* zdejmuje z tytułu wszystko, co dokleiła przeglądarka */
   function cleanTab(title) {
     var t = norm(title);
     t = t.replace(NOTIF_COUNT, '').replace(AUDIO_MARK, '');
@@ -361,7 +307,7 @@
     return t;
   }
 
-  /* Czy to okno rozmowy? Nazwa spotkania albo null. */
+  // nazwa spotkania albo null
   function meetingOf(exe, title) {
     var app = String(exe || '').toLowerCase();
     for (var i = 0; i < MEETING_APPS.length; i++) {
@@ -397,26 +343,20 @@
     return cap ? Math.min(total, cap) : total;
   }
 
-  /**
-   * @param {string} exe   nazwa procesu, np. "chrome.exe"
-   * @param {string} title tytuł okna
-   * @returns {{app,appName,isBrowser,tab,site,group,kind,why,work,chill}}
-   */
   function classify(exe, title) {
     var app = norm(exe);
     var rawTitle = norm(title);
     var browser = findBrowser(app);
     var tab = browser ? cleanTab(rawTitle) : rawTitle;
     var hay = makeHay(tab + ' ' + app);
-    /* Serwisy skanujemy po SAMEJ karcie. Doklejone "chrome.exe" psuloby
-       wzorce zaczepione o koniec tytulu, np. "#dev (Firma) - Slack". */
+    // Serwisy tylko po karcie - doklejone "chrome.exe" psułoby wzorce
+    // zakotwiczone na końcu tytułu, np. "#dev (Firma) - Slack".
     var hayTab = makeHay(tab);
 
     var work = 0, chill = 0, why = '', appName = app || 'Nieznana aplikacja';
     var site = null, kind = 'neutral';
-    var shortForm = false;      // rolka / short — o progu decyduje app.js
+    var shortForm = false;
 
-    // 1. aplikacja
     var appLower = app.toLowerCase();
     for (var i = 0; i < APPS.length; i++) {
       if (appLower.indexOf(APPS[i].m) !== -1) {
@@ -429,7 +369,6 @@
     }
     if (browser) appName = browser.name;
 
-    // 2. serwis w karcie przeglądarki
     if (browser) {
       for (var s = 0; s < SITES.length; s++) {
         var words = SITES[s].m, hit = false;
@@ -447,7 +386,6 @@
       }
     }
 
-    // 3. słowa w tytule — tu rozstrzyga się "research czy głupotki"
     var wHits = [], cHits = [];
     scanList(WORK_WORDS, hay, wHits);
     scanList(CHILL_WORDS, hay, cHits);
@@ -462,7 +400,6 @@
       if (hasSignal(hay, SHORT_WORDS[sw])) shortForm = true;
     }
 
-    // 4. werdykt
     if (work === 0 && chill === 0) kind = 'neutral';
     else if (work > chill) kind = 'work';
     else if (chill > work) kind = 'chill';
@@ -476,13 +413,13 @@
       isBrowser: !!browser,
       tab: tab,
       site: site,
-      group: browser ? (site || (browser.name + ' — inne')) : appName,
+      group: browser ? (site || (browser.name + ' - inne')) : appName,
       kind: kind,
       work: work,
       chill: chill,
       why: why,
-      meeting: meetingOf(app, rawTitle),   // nazwa spotkania albo null
-      short: shortForm && kind === 'chill' // rolka do rozliczenia progiem dnia
+      meeting: meetingOf(app, rawTitle),
+      short: shortForm && kind === 'chill'
     };
   }
 

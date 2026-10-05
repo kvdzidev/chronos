@@ -1,18 +1,15 @@
-/* ══════════════════════════════════════════════════════════════
-   CHRONOS — time tracker
-   Vanilla JS, brak zależności. Dane w localStorage.
-   ══════════════════════════════════════════════════════════════ */
+// CHRONOS - time tracker. Bez zależności, dane w localStorage.
 (function () {
   'use strict';
 
   var KEY = 'chronos.v1';
 
-  /* Słownik i ikony żyją w osobnych plikach — tu tylko krótkie uchwyty.
-     `tr` zamiast `t`, bo `t` jest w kilku miejscach lokalną zmienną. */
+  // tr, a nie t, bo t bywa lokalną zmienną
   var I18N = window.CHRONOS_I18N;
   var ICO = window.CHRONOS_ICONS;
   function tr(key, vars) { return I18N ? I18N.t(key, vars) : key; }
   function loc() { return I18N ? I18N.locale() : 'pl-PL'; }
+  function label(name) { return I18N && I18N.label ? I18N.label(name) : name; }
   var $ = function (id) { return document.getElementById(id); };
   var el = function (tag, cls, txt) {
     var n = document.createElement(tag);
@@ -28,53 +25,41 @@
   ];
 
 
-  /* Po tylu sekundach bez ruchu myszy i klawiatury czas przestaje być Twój —
-     lecimy na "offline", a bezczynność zostaje wycięta z trwającej sesji.
-     40 s, a nie 15: przeczytanie akapitu, spojrzenie w notatki albo namysł
-     nad zdaniem to wciąż praca, a nie nieobecność. */
+  // Sekundy bezczynności, po których przechodzimy w offline. Nie mniej,
+  // bo czytanie czy namysł to też praca.
   var OFFLINE_AFTER = 40;
 
-  /* Wyjątek: spotkanie. Na Meet, Zoomie, Slacku czy Teamsach zwykle się
-     SŁUCHA — mysz stoi godzinę, a Ty jesteś. Tam bezczynność liczy się
-     dopiero po tylu sekundach. Próg jest, a nie znika zupełnie, bo wyjście
-     od komputera z otwartym Meetem też musi kiedyś trafić do offline'u. */
+  // Na spotkaniu mysz potrafi stać godzinę. Limit mimo to jest, żeby
+  // zostawiony otwarty Meet też kiedyś przeszedł w offline.
   var MEETING_OFFLINE_AFTER = 45 * 60;
 
-  /* Rolka, short czy TikTok bywa zwykłym szukaniem czegoś do pracy. Dopiero
-     gdy w ciągu doby uzbiera się ich więcej niż tyle, CAŁY ten czas liczy się
-     jako rozrywka. Poniżej progu jest neutralny — ani nie karze, ani nie
-     nagradza. Liczone od nowa każdego dnia. */
+  // Dzienny limit rolek/shortów, poniżej którego są neutralne (applyShortGrace).
   var SHORT_GRACE = 3 * 60 * 1000;
 
-  /* Numer migracji zapisu. Rośnie, gdy dochodzi przeróbka istniejących
-     danych — dzięki temu każda leci dokładnie raz i nie cofa późniejszych
-     ręcznych poprawek. */
+  // Podbić przy nowej migracji danych - każda wykonuje się tylko raz.
   var MIGRATION = 2;
 
-  /* Kategorie sprzed przejścia na wektory trzymają emoji. Tłumaczymy je na
-     najbliższą ikonę, zamiast kazać komukolwiek klikać to od nowa. */
+  // Starsze zapisy mają emoji zamiast ikon.
   var EMOJI_TO_ICON = {
-    '🎯': 'target',   '💻': 'code',     '📚': 'book',     '✍️': 'pen',
-    '🧠': 'bulb',     '🔬': 'flask',    '🎨': 'palette',  '🎧': 'music',
-    '📈': 'trend',    '💡': 'bulb',     '🏋️': 'dumbbell', '🏃': 'dumbbell',
-    '🧘': 'leaf',     '⚽': 'globe',    '🎸': 'music',    '🍳': 'coffee',
-    '🧹': 'sliders',  '🛒': 'cart',     '💬': 'chat',     '📞': 'phone',
-    '📝': 'note',     '🗂️': 'folder',   '🧩': 'cube',     '⚙️': 'sliders',
-    '🚀': 'rocket',   '🔧': 'wrench',   '🎬': 'film',     '📷': 'camera',
-    '🌱': 'leaf',     '☕': 'coffee',   '🌙': 'moon',     '⏱️': 'clock',
-    '🔥': 'bolt',     '⭐': 'star',     '🧭': 'compass',  '🗺️': 'globe',
-    '💰': 'coin',     '🏛️': 'shield',   '🐍': 'code',     '🧪': 'flask',
-    '🎮': 'gamepad'
+    '\uD83C\uDFAF': 'target',   '\uD83D\uDCBB': 'code',     '\uD83D\uDCDA': 'book',     '\u270D\uFE0F': 'pen',
+    '\uD83E\uDDE0': 'bulb',     '\uD83D\uDD2C': 'flask',    '\uD83C\uDFA8': 'palette',  '\uD83C\uDFA7': 'music',
+    '\uD83D\uDCC8': 'trend',    '\uD83D\uDCA1': 'bulb',     '\uD83C\uDFCB\uFE0F': 'dumbbell', '\uD83C\uDFC3': 'dumbbell',
+    '\uD83E\uDDD8': 'leaf',     '\u26BD': 'globe',    '\uD83C\uDFB8': 'music',    '\uD83C\uDF73': 'coffee',
+    '\uD83E\uDDF9': 'sliders',  '\uD83D\uDED2': 'cart',     '\uD83D\uDCAC': 'chat',     '\uD83D\uDCDE': 'phone',
+    '\uD83D\uDCDD': 'note',     '\uD83D\uDDC2\uFE0F': 'folder',   '\uD83E\uDDE9': 'cube',     '\u2699\uFE0F': 'sliders',
+    '\uD83D\uDE80': 'rocket',   '\uD83D\uDD27': 'wrench',   '\uD83C\uDFAC': 'film',     '\uD83D\uDCF7': 'camera',
+    '\uD83C\uDF31': 'leaf',     '\u2615': 'coffee',   '\uD83C\uDF19': 'moon',     '\u23F1\uFE0F': 'clock',
+    '\uD83D\uDD25': 'bolt',     '\u2B50': 'star',     '\uD83E\uDDED': 'compass',  '\uD83D\uDDFA\uFE0F': 'globe',
+    '\uD83D\uDCB0': 'coin',     '\uD83C\uDFDB\uFE0F': 'shield',   '\uD83D\uDC0D': 'code',     '\uD83E\uDDEA': 'flask',
+    '\uD83C\uDFAE': 'gamepad'
   };
 
-  /* Serwisy, które przestały być rozrywką — patrz migracja niżej. */
+  // Dawniej liczone jako rozrywka, patrz migrate().
   var NOW_WORK = ['Messenger', 'Facebook', 'Discord'];
 
-  var MIN_SEGMENT = 3000;      // krótsze przeskoki okien nie zaśmiecają dziennika
-  var KEEP_DAYS = 30;          // po tylu dniach dziennik aktywności jest przycinany
-  var DAILY_GOAL_MS = 6 * 3600000;   // cel pracy na dzień — wchodzi do rankingu
-
-  /* ─────────────── stan ─────────────── */
+  var MIN_SEGMENT = 3000;      // krótsze przełączenia okien pomijamy
+  var KEEP_DAYS = 30;
+  var DAILY_GOAL_MS = 6 * 3600000;   // cel dzienny do rankingu
 
   var state = {
     categories: [],
@@ -83,7 +68,7 @@
     active: null,          // { categoryId, sessionStart, segmentStart|null, elapsed }
     selectedId: null,
     targetMin: 0,
-    autoSwitch: false      // automatyczne przypisanie czasu wg reguł i klasyfikatora
+    autoSwitch: false
   };
 
   var SEED = [
@@ -91,11 +76,10 @@
     { key: 'seed.chill', color: '#ffb454', kind: 'chill', logo: { type: 'icon', value: 'gamepad' }, rules: [] }
   ];
 
-  var REV = 0;          // numer zapisu — rośnie z każdym zapisem, chroni przed
-                        // nadpisaniem nowszych danych przez drugą kartę
+  var REV = 0;          // licznik zapisów, patrz save()
 
   var ui = {
-    mode: 'day',                       // 'day' albo 'month'
+    mode: 'day',
     statsMonth: startOfMonth(Date.now()),
     statsDay: startOfDay(Date.now()),
     editingId: null,
@@ -103,28 +87,30 @@
     memoryOnly: false
   };
 
-  /* ── migracje zapisu ──
-     Zmiana reguł nie może zostawiać starych danych w sprzeczności z tym, co
-     aplikacja mówi dzisiaj. Każda migracja leci raz, po numerze w zapisie. */
+  // Zwraca liczbę zmienionych kategorii.
+  function iconizeLogos(list) {
+    var n = 0;
+    for (var i = 0; i < list.length; i++) {
+      var lg = list[i].logo;
+      if (!lg || lg.type !== 'emoji') continue;
+      list[i].logo = {
+        type: 'icon',
+        value: EMOJI_TO_ICON[lg.value] ||
+               EMOJI_TO_ICON[String(lg.value).replace(/\uFE0F/g, '')] || 'target'
+      };
+      n++;
+    }
+    return n;
+  }
+
+  // Migracje zapisu, wg numeru m zapisanego w danych.
   function migrate(from) {
     if (from >= MIGRATION) return;
     var zmian = 0;
 
-    // 1. emoji w logo kategorii → ikona wektorowa
-    for (var i = 0; i < state.categories.length; i++) {
-      var lg = state.categories[i].logo;
-      if (!lg || lg.type !== 'emoji') continue;
-      var name = EMOJI_TO_ICON[lg.value] ||
-                 EMOJI_TO_ICON[String(lg.value).replace(/\uFE0F/g, '')] || 'target';
-      state.categories[i].logo = { type: 'icon', value: name };
-      zmian++;
-    }
+    zmian += iconizeLogos(state.categories);
 
-    /* 2. Messenger, Facebook i Discord przestały być rozrywką. Dziennik
-          aktywności zebrany wcześniej nadal twierdzi coś innego, więc
-          przepisujemy go — inaczej wczorajszy wynik kłóciłby się z dzisiejszą
-          regułą. Ruszamy WYŁĄCZNIE odcinki oznaczone jako rozrywka; to, co
-          już było pracą albo neutralne, zostaje nietknięte. */
+    // NOW_WORK: przepisujemy tylko stare odcinki oznaczone jako rozrywka
     var work = categoryByKind('work');
     for (var j = 0; j < state.activity.length; j++) {
       var a = state.activity[j];
@@ -132,7 +118,6 @@
       if (NOW_WORK.indexOf(a.group) === -1) continue;
       a.kind = 'work';
       a.why = 'serwis: ' + a.group;
-      // odcinek wisiał na kategorii typu "chill" — przenosimy go do pracy
       var cat = byId(a.catId);
       if (work && (!cat || (cat.kind || 'work') === 'chill')) a.catId = work.id;
       zmian++;
@@ -140,8 +125,6 @@
 
     if (zmian > 0) save();
   }
-
-  /* ─────────────── trwałość ─────────────── */
 
   function load() {
     var raw = null;
@@ -165,8 +148,7 @@
       restoreRunning(d);
       prune();
     } catch (e) {
-      /* Błąd odczytu NIGDY nie kasuje historii. Odkładamy oryginał na bok
-         i startujemy pusto — dane zostają do odzyskania ręcznie. */
+      // Uszkodzonego zapisu nie kasujemy, zostaje pod osobnym kluczem.
       try { localStorage.setItem(KEY + '.uszkodzone', raw); } catch (e2) {}
       if (window.console && console.error) console.error('CHRONOS: nie udało się wczytać zapisu', e);
       ui.loadFailed = true;
@@ -175,7 +157,6 @@
     }
   }
 
-  /* Praca i Chill — jedyne, co pojawia się na start. Zero zmyślonych sesji. */
   function seed() {
     state.categories = SEED.map(function (s, i) {
       return {
@@ -187,10 +168,8 @@
     save();
   }
 
-  /* Aplikacja mogła zostać zamknięta w trakcie pomiaru — albo grzecznie
-     (zegar zatrzymany przy zamykaniu), albo twardo (ubity proces). W obu
-     wypadkach liczymy czas najwyżej do ostatniego zapisu, nigdy do teraz.
-     Inaczej nocne zamknięcie apki dopisałoby osiem godzin "pracy". */
+  // Czas sprzed zamknięcia liczymy tylko do savedAt, nie do teraz - inaczej
+  // przerwa między uruchomieniami wliczyłaby się do sesji.
   function restoreRunning(d) {
     var savedAt = typeof d.savedAt === 'number' ? d.savedAt : Date.now();
     var przerwa = Math.max(0, Date.now() - savedAt);
@@ -203,7 +182,6 @@
     if (!state.active) return;
 
     if (state.active.segmentStart) {
-      // zegar był w biegu w chwili zapisu — doliczamy tylko do savedAt
       var w_biegu = Math.max(0, savedAt - state.active.segmentStart);
       state.active.elapsed = (state.active.elapsed || 0) + w_biegu;
       state.active.segmentStart = null;
@@ -232,7 +210,7 @@
   function save() {
     if (ui.memoryOnly) return;
     try {
-      // Jeśli inna karta zapisała nowszą wersję, nie depczemy jej danych.
+      // wyższy rev w storage = zapisała inna karta, nie nadpisujemy
       var cur = localStorage.getItem(KEY);
       if (cur) {
         var curRev = 0;
@@ -277,9 +255,14 @@
     return null;
   }
 
-  /* ─────────────── czas: pomocnicze ─────────────── */
+  // Daty i formatowanie
 
   function startOfDay(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+  // Po kalendarzu, nie + DAY - przy zmianie czasu doba ma 23 lub 25 h.
+  function addDays(ts, n) {
+    var d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d.getTime();
+  }
 
   function startOfMonth(ts) {
     var d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(1); return d.getTime();
@@ -290,7 +273,7 @@
   function daysInMonth(ts) {
     var d = new Date(ts); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   }
-  /* poniedzialek = 0, niedziela = 6 — polski uklad tygodnia */
+  // poniedziałek = 0, niedziela = 6
   function weekday(ts) { return (new Date(ts).getDay() + 6) % 7; }
 
   function fmtMonth(ts) {
@@ -330,7 +313,6 @@
     return new Date(ts).toLocaleDateString(loc(), { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  /* elapsed aktywnej sesji */
   function activeElapsed() {
     if (!state.active) return 0;
     var e = state.active.elapsed || 0;
@@ -340,9 +322,9 @@
 
   function isRunning() { return !!(state.active && state.active.segmentStart); }
 
-  /* sesje danego dnia (uwzględnia sesję trwającą) */
+  // łącznie z trwającą sesją
   function sessionsForDay(dayStart) {
-    var dayEnd = dayStart + DAY;
+    var dayEnd = addDays(dayStart, 1);
     var out = [];
     for (var i = 0; i < state.sessions.length; i++) {
       var s = state.sessions[i];
@@ -360,7 +342,7 @@
     return out;
   }
 
-  /* część sesji przypadająca na dany dzień (proporcjonalnie) */
+  // proporcjonalna część sesji w przedziale [from, to)
   function durationInRange(s, from, to) {
     var span = Math.max(1, s.end - s.start);
     var ov = Math.min(s.end, to) - Math.max(s.start, from);
@@ -372,7 +354,7 @@
     var map = {}, total = 0;
     for (var i = 0; i < list.length; i++) {
       var s = list[i];
-      var d = dayStart == null ? (s.duration || 0) : durationInRange(s, dayStart, dayStart + DAY);
+      var d = dayStart == null ? (s.duration || 0) : durationInRange(s, dayStart, addDays(dayStart, 1));
       if (d <= 0) continue;
       map[s.categoryId] = (map[s.categoryId] || 0) + d;
       total += d;
@@ -393,11 +375,8 @@
     return { rows: rows, total: total };
   }
 
-  /* ─────────────── logo ─────────────── */
-
   function paintLogo(node, cat, size) {
     node.innerHTML = '';
-    node.classList.remove('cat__logo--emoji');
     var logo = cat && cat.logo;
     if (logo && logo.type === 'image' && logo.value) {
       var img = document.createElement('img');
@@ -407,22 +386,13 @@
       img.decoding = 'async';
       node.appendChild(img);
     } else if (logo && logo.type === 'icon' && ICO && ICO.has(logo.value)) {
-      // kreska dziedziczy kolor kategorii przez currentColor
+      // kolor kategorii przez currentColor
       node.innerHTML = ICO.svg(logo.value, size ? Math.round(size * 1.1) : 18);
-    } else if (logo && logo.type === 'emoji' && logo.value) {
-      // starsze kategorie sprzed przejścia na ikony — nadal się rysują
-      node.classList.add('cat__logo--emoji');
-      node.textContent = logo.value;
-      if (size) node.style.fontSize = size + 'px';
     } else {
       var name = (cat && cat.name) || '?';
       node.textContent = name.trim().slice(0, 2).toUpperCase();
     }
   }
-
-  /* ══════════════════════════════════════════════
-     RENDER: lewa szyna
-     ══════════════════════════════════════════════ */
 
   function renderRail() {
     var list = $('catList');
@@ -444,7 +414,7 @@
       var body = el('div', 'cat__body');
       body.appendChild(el('span', 'cat__name', c.name));
       var ms = perCat[c.id] || 0;
-      body.appendChild(el('span', 'cat__time', ms > 0 ? fmtHM(ms) : '—'));
+      body.appendChild(el('span', 'cat__time', ms > 0 ? fmtHM(ms) : '-'));
 
       var right = el('div', 'cat__right');
       if (state.active && state.active.categoryId === c.id) {
@@ -471,7 +441,6 @@
 
   function selectCat(id) {
     if (state.active && state.active.categoryId !== id) {
-      // przełączenie kategorii w trakcie pomiaru → zapisz i startuj nową
       commit(true);
       state.selectedId = id;
       applyAccent();
@@ -505,10 +474,6 @@
   }
   function pad2hex(v) { var s = v.toString(16); return s.length < 2 ? '0' + s : s; }
 
-  /* ══════════════════════════════════════════════
-     RENDER: tarcza timera
-     ══════════════════════════════════════════════ */
-
   var TICKS = 60, R = 140, CIRC = 2 * Math.PI * R;
 
   function buildTicks() {
@@ -538,28 +503,23 @@
     dial.classList.toggle('is-running', running);
     dial.disabled = !cat;
 
-    // czas
     var total = Math.floor(ms / 1000);
     $('tH').textContent = pad(Math.floor(total / 3600));
     $('tM').textContent = pad(Math.floor((total % 3600) / 60));
     $('tS').textContent = pad(total % 60);
     $('timeDisplay').classList.toggle('is-zero', ms === 0);
 
-    // kategoria na tarczy
     $('dialCatName').textContent = cat ? cat.name : tr('dial.pickCat');
     $('dialCatDot').style.background = cat ? cat.color : 'var(--ink-tertiary)';
 
-    // podpowiedź
     $('dialHint').textContent = !cat ? tr('dial.hintNoCat')
       : tr(running ? 'dial.hintPause'
          : state.active ? 'dial.hintResume' : 'dial.hintStart');
 
-    // status
     var st = $('status');
     st.dataset.state = running ? 'running' : (paused ? 'paused' : 'idle');
     $('statusText').textContent = tr(running ? 'status.running' : (paused ? 'status.paused' : 'status.ready'));
 
-    // łuk
     var target = state.targetMin * 60000;
     var progress = target > 0
       ? Math.min(1, ms / target)
@@ -576,7 +536,6 @@
       head.setAttribute('opacity', '0');
     }
 
-    // podświetlone znaczniki
     var lit = Math.round(progress * TICKS);
     var lines = $('ticks').childNodes;
     for (var i = 0; i < lines.length; i++) {
@@ -584,7 +543,6 @@
       lines[i].classList.toggle('is-lit', !!on);
     }
 
-    // przyciski
     $('playBtn').disabled = !cat;
     $('playLabel').textContent = tr(running ? 'btn.pause' : (state.active ? 'btn.resume' : 'btn.start'));
     $('playIcon').innerHTML = running
@@ -593,16 +551,11 @@
     $('stopBtn').disabled = !state.active;
     $('discardBtn').disabled = !state.active;
 
-    // cele
     var chips = $('targets').querySelectorAll('.chip');
     for (var j = 0; j < chips.length; j++) {
       chips[j].setAttribute('aria-pressed', String(Number(chips[j].dataset.target) === state.targetMin));
     }
   }
-
-  /* ══════════════════════════════════════════════
-     RENDER: panel dnia
-     ══════════════════════════════════════════════ */
 
   function renderPanel() {
     var day = startOfDay(Date.now());
@@ -614,9 +567,8 @@
 
     var longest = 0;
     list.forEach(function (s) { longest = Math.max(longest, s.duration || 0); });
-    $('dayLongest').textContent = longest > 0 ? fmtHM(longest) : '—';
+    $('dayLongest').textContent = longest > 0 ? fmtHM(longest) : '-';
 
-    // pasek proporcji
     var bar = $('dayBar');
     bar.innerHTML = '';
     t.rows.forEach(function (r) {
@@ -627,7 +579,6 @@
     });
     if (!t.rows.length) { bar.innerHTML = '<span style="width:100%;background:var(--surface-3)"></span>'; }
 
-    // podział
     var split = $('splitList');
     split.innerHTML = '';
     $('splitEmpty').hidden = t.rows.length > 0;
@@ -648,18 +599,17 @@
       fill.style.width = ((r.ms / max) * 100).toFixed(1) + '%';
       track.appendChild(fill);
 
-      var pct = el('div', 'srow__pct', ((r.ms / t.total) * 100).toFixed(0) + '% dnia');
+      var pct = el('div', 'srow__pct', tr('panel.dayShare', { pct: ((r.ms / t.total) * 100).toFixed(0) }));
 
       row.appendChild(name); row.appendChild(val);
       row.appendChild(track); row.appendChild(pct);
       split.appendChild(row);
     });
 
-    // pasek 24h
     var strip = $('dayStrip');
     strip.innerHTML = '';
     list.forEach(function (s) {
-      var from = Math.max(s.start, day), to = Math.min(s.end, day + DAY);
+      var from = Math.max(s.start, day), to = Math.min(s.end, addDays(day, 1));
       if (to <= from) return;
       var c = byId(s.categoryId);
       var seg = el('div', 'strip__seg');
@@ -672,7 +622,6 @@
     now.style.left = (((Date.now() - day) / DAY) * 100) + '%';
     strip.appendChild(now);
 
-    // ostatnie sesje
     var recent = list.slice().sort(function (a, b) { return b.start - a.start; }).slice(0, 5);
     var rl = $('recentList');
     rl.innerHTML = '';
@@ -691,9 +640,7 @@
     });
   }
 
-  /* ══════════════════════════════════════════════
-     STEROWANIE TIMEREM
-     ══════════════════════════════════════════════ */
+  // Timer
 
   var reachedNotified = false;
 
@@ -745,12 +692,8 @@
     toast(tr('toast.discarded'));
   }
 
-  /* ── pętla odświeżania ──
-     250 ms trzyma płynny łuk na tarczy, ale reszty nie wolno przebudowywać
-     cztery razy na sekundę: panel dnia, szyna i statystyki zmieniają się
-     najwyżej raz na sekundę, więc tylko tyle razy są malowane. Ukryte okno
-     nie maluje nic — zostaje sama logika celu, żeby powiadomienie o końcu
-     sesji nie przepadło. */
+  // Co 250 ms dla płynnego łuku; reszta UI raz na sekundę. W ukrytej karcie
+  // tylko pilnujemy celu.
   var lastPaintSec = -1;
 
   function tick() {
@@ -761,15 +704,16 @@
       if (!document.hidden) flash();
     }
 
-    if (document.hidden) return;             // malowanie bez widza to czysty koszt
+    if (document.hidden) return;
 
-    if (state.active) renderDial();          // łuk i cyfry — tania ścieżka, 4 Hz
+    if (state.active) renderDial();
 
     var sec = Math.floor(Date.now() / 1000);
     if (sec === lastPaintSec) return;
     lastPaintSec = sec;
 
-    if (state.active) {
+    // przebudowa DOM przy wciśniętym przycisku myszy gubi kliknięcie
+    if (state.active && !ui.holding) {
       renderPanel();
       renderRail();
       if (!$('statsOverlay').hidden) renderStats();
@@ -785,47 +729,31 @@
     );
   }
 
-  /* auto-zapis pozycji sesji, gdyby karta została zamknięta */
+  // na wypadek zamknięcia karty bez pagehide
   setInterval(function () { if (state.active) save(); }, 5000);
 
-  /* ══════════════════════════════════════════════
-     AGENT LOKALNY — podgląd aktywnego okna
-     ══════════════════════════════════════════════ */
+  // Agent lokalny - aktywne okno
 
   var AGENT = {
-    /* Dwa warianty, oba obsługiwane bez konfiguracji:
-       1. /agent/now       — agent wbudowany w chronos.py (ten sam adres, zero CORS)
-       2. :8900/now        — osobny agent.cmd, gdy ktoś woli go trzymać obok  */
+    // agent wbudowany w chronos.py albo osobny agent.cmd na :8900
     urls: ['/agent/now', 'http://127.0.0.1:8900/now'],
-    probe: 0,           // który adres sprawdzamy, dopóki żaden nie odpowie
-    url: null,          // zapamiętany adres działającego agenta
-    on: false,          // czy agent odpowiada
-    seen: false,        // czy kiedykolwiek odpowiedział w tej sesji
+    probe: 0,           // indeks w urls, dopóki żaden nie odpowie
+    url: null,
+    on: false,
+    seen: false,        // odpowiedział choć raz w tej sesji
     data: null,         // { title, app, idle }
-    matchId: null,      // kategoria dopasowana do bieżącego okna
-    matchSince: 0,      // od kiedy trwa to dopasowanie (debounce)
+    matchId: null,
+    matchSince: 0,      // do debounce, patrz SWITCH_DELAY
     misses: 0
   };
 
-  var SWITCH_DELAY = 5000;   // okno musi utrzymać się 5 s, żeby przełączyć kategorię
-
-  /* ── decyzja: do której kategorii należy to okno ──
-     1. własna reguła użytkownika (zawsze wygrywa),
-     2. werdykt klasyfikatora (praca / chill) → pierwsza kategoria tego typu.  */
+  var SWITCH_DELAY = 5000;   // tyle okno musi być na wierzchu, żeby przełączyć kategorię
 
   var CLS = window.CHRONOS_CLASSIFY || null;
 
-  /* ── dwa monitory: patrzymy na oba naraz ──
-     Agent oddaje po jednym oknie z każdego ekranu (`screens`). Czas i tak ma
-     jednego właściciela — okno na wierzchu — bo doba ma 24 godziny i nie da
-     się jej policzyć dwa razy. Drugi ekran rozstrzyga dwie rzeczy:
-
-       • spotkanie na KTÓRYMKOLWIEK ekranie znosi offline (patrz meetingOf),
-       • gdy okno na wierzchu nic nie znaczy (Eksplorator, pulpit, Messenger),
-         a obok leci Twitch — to jednak rozrywka.
-
-     Starszy agent bez pola `screens` działa dalej: schodzimy wtedy do
-     pojedynczego okna na wierzchu. */
+  // Agent zwraca okno z każdego ekranu (screens). Czas należy do okna na
+  // wierzchu, pozostałe ekrany liczą się przy spotkaniu albo gdy okno na
+  // wierzchu jest neutralne. Starszy agent nie wysyła screens.
 
   function screensOf(d) {
     if (!d) return [];
@@ -833,14 +761,14 @@
     return [{ title: d.title, app: d.app, fg: true, screen: 0 }];
   }
 
-  /* werdykt z ekranu, na którym akurat nie pracujesz */
+  // pierwszy nieneutralny werdykt z ekranów w tle
   function sideVerdict(d) {
     if (!CLS) return null;
     var list = screensOf(d);
     for (var i = 0; i < list.length; i++) {
       if (list[i].fg) continue;
       var c = CLS.classify(list[i].app, list[i].title);
-      if (c && c.kind !== 'neutral') return c;
+      if (c && c.kind !== 'neutral') { c.win = list[i]; return c; }
     }
     return null;
   }
@@ -856,21 +784,19 @@
         cls.kind = side.kind;
         cls.short = side.short;
         cls.side = side.site || side.appName;
+        cls.sideWin = side.win;
         cls.why = 'drugi ekran: ' + cls.side;
       }
     }
     return cls;
   }
 
-  /* Po ilu sekundach bezczynności to okno idzie na offline.
-     Spotkanie dostaje własny, dużo dłuższy próg. */
+  // Spotkanie wydłuża próg, chyba że ekran jest zablokowany.
   function offlineLimit(d) {
-    if (!d || !CLS || typeof CLS.meeting !== 'function') return OFFLINE_AFTER;
-    return CLS.meeting(d.app, d.title) ? MEETING_OFFLINE_AFTER : OFFLINE_AFTER;
+    if (d && /lockapp\.exe/i.test(d.app || '')) return OFFLINE_AFTER;
+    return meetingOf(d) ? MEETING_OFFLINE_AFTER : OFFLINE_AFTER;
   }
 
-  /* Spotkanie na dowolnym ekranie. Meet na drugim monitorze liczy się tak
-     samo jak na pierwszym — i o to w tym całym progu chodzi. */
   function meetingOf(d) {
     if (!d || !CLS || typeof CLS.meeting !== 'function') return null;
     var list = screensOf(d);
@@ -907,12 +833,14 @@
     if (byRule) return byRule;
     var cls = classifyWindow(d);
     if (!cls || cls.kind === 'neutral') return null;
-    return categoryByKind(cls.kind);
+    // werdykt z drugiego ekranu: reguły sprawdzamy też na tamtym oknie
+    var sideRule = cls.sideWin ? ruleMatch(cls.sideWin) : null;
+    return sideRule || categoryByKind(cls.kind);
   }
 
-  /* ── dziennik aktywności: co, gdzie i ile ── */
+  // Dziennik aktywności
 
-  var seg = null;   // biezacy odcinek: { key, s, e, meta }
+  var seg = null;   // bieżący odcinek: { key, s, e, meta }
 
   function flushSegment(endAt) {
     if (!seg) return;
@@ -934,7 +862,7 @@
     var idle = Number(d.idle || 0);
 
     if (idle >= offlineLimit(d)) {
-      // bezczynnosc zaczela sie `idle` sekund temu — dokladnie tam tniemy odcinek
+      // bezczynność zaczęła się idle sekund temu - tam tniemy odcinek
       var cut = now - idle * 1000;
       if (seg && seg.key !== '__offline') flushSegment(cut);
       if (!seg) {
@@ -951,12 +879,8 @@
     var cls = classifyWindow(d);
     if (!cls) return;
 
-    /* Kto decyduje, do jakiej kategorii trafia ten odcinek:
-       1. klasyfikator, jeśli ma zdanie (praca/chill) — Messenger w trakcie
-          sesji "Praca" ma być chillem, a nie pracą,
-       2. trwająca sesja, gdy klasyfikator jest neutralny (eksplorator plików
-          w środku pracy to nadal praca),
-       3. nic — odcinek ląduje w "Nieprzypisane".                            */
+    // Kolejność: reguła lub klasyfikator, potem trwająca sesja (neutralne
+    // okno w trakcie pracy to nadal praca), na końcu nieprzypisane.
     var matched = matchCategory(d);
     var catId = matched ? matched.id
       : (state.active ? state.active.categoryId : null);
@@ -974,7 +898,7 @@
     };
   }
 
-  /* ── offline wstrzymuje pomiar i oddaje wycieta bezczynnosc ── */
+  // offline pauzuje pomiar i odejmuje czas bezczynności
   function handleOffline(idle, limit) {
     var offline = idle >= (limit || OFFLINE_AFTER);
 
@@ -996,16 +920,14 @@
     }
   }
 
-  /* Odpytujemy często, gdy agent odpowiada; gdy go nie ma — wygaszamy tempo,
-     żeby nie zasypywać konsoli błędami sieci i nie pukać w port bez końca. */
+  // Bez agenta odpytujemy coraz rzadziej, żeby nie zaśmiecać konsoli.
   function scheduleAgent() {
     if (AGENT.host && AGENT.timer) {
       try { AGENT.host.clearTimeout(AGENT.timer); } catch (e) {}
     }
     var delay = AGENT.on ? 1500
       : (AGENT.misses <= 3 ? 4000 : (AGENT.misses <= 10 ? 15000 : 60000));
-    // timery w oknie PiP nie sa dlawione — dlatego to ono odmierza,
-    // gdy tylko jest otwarte
+    // timery okna PiP nie są dławione, więc odliczamy w nim, gdy jest otwarte
     AGENT.host = (mini.win && !mini.win.closed) ? mini.win : window;
     AGENT.timer = AGENT.host.setTimeout(pollAgent, delay);
   }
@@ -1034,14 +956,14 @@
         AGENT.dirty = (AGENT.dirty || 0) + 1;
         if (AGENT.dirty >= 4) { AGENT.dirty = 0; save(); }    // dziennik na dysk co ~6 s
         renderMonitor();
-        if (!$('statsOverlay').hidden) renderStats();
+        if (!$('statsOverlay').hidden && !ui.holding) renderStats();
       })
       .catch(function () {
         clearTimeout(killer);
         scheduleAgent();
         AGENT.misses++;
         AGENT.url = null;
-        AGENT.probe++;                 // następnym razem drugi wariant adresu
+        AGENT.probe++;
         if (AGENT.misses >= 2 && AGENT.on) {
           AGENT.on = false; AGENT.data = null;
           AGENT.matchId = null; AGENT.matchSince = 0;
@@ -1053,7 +975,6 @@
       });
   }
 
-  /* przełączenie kategorii, gdy okno pasuje do innej reguły */
   function applyAutoSwitch(cat) {
     var id = cat ? cat.id : null;
     if (id !== AGENT.matchId) { AGENT.matchId = id; AGENT.matchSince = Date.now(); }
@@ -1072,8 +993,7 @@
     toast(tr('toast.autoSwitch', { from: from ? from.name + ' → ' : '', name: cat.name }));
   }
 
-  /* Co widać na pozostałych monitorach — bez tego drugi ekran wpływałby na
-     wynik po cichu, a to jedyna rzecz, której taki tracker robić nie może. */
+  // Pokazujemy pozostałe ekrany, bo wpływają na klasyfikację.
   function renderScreens(d) {
     var box = $('monScreens');
     if (!box) return;
@@ -1089,7 +1009,7 @@
       chip.dataset.kind = cls ? cls.kind : 'neutral';
       chip.appendChild(el('i', 'mon__screen-n', String((s.screen || 0) + 1)));
       chip.appendChild(el('span', null,
-        (cls && (cls.site || cls.appName)) || s.app || 'okno'));
+        label((cls && (cls.site || cls.appName)) || s.app) || tr('mon.window')));
       chip.title = s.title || '';
       box.appendChild(chip);
     }
@@ -1131,11 +1051,10 @@
     }
 
     var idle = Number(d.idle || 0);
-    var meet = meetingOf(d);
+    var meet = offlineLimit(d) > OFFLINE_AFTER ? meetingOf(d) : null;
     var idleEl = $('monIdle');
     if (meet && idle >= OFFLINE_AFTER) {
-      // wprost mówimy, dlaczego stojąca mysz nic tu nie zmienia
-      idleEl.textContent = tr('mon.meetingIdle', { name: meet });
+      idleEl.textContent = tr('mon.meetingIdle', { name: label(meet) });
       idleEl.dataset.meet = '1';
     } else {
       idleEl.textContent = idle >= 60 ? tr('mon.idle', { min: Math.floor(idle / 60) }) : '';
@@ -1143,17 +1062,7 @@
     }
   }
 
-  /* ══════════════════════════════════════════════
-     STATYSTYKI (modal)
-     ══════════════════════════════════════════════ */
-
-  /* ══════════════════════════════════════════════
-     MINI-NAKŁADKA (Document Picture-in-Picture)
-
-     Prawdziwe okno systemowe: trzyma się nad wszystkim, da się je
-     przeciągać i zmieniać rozmiar, a przeglądarkę można zminimalizować.
-     Ten sam stan co w dużym oknie — żadnej synchronizacji.
-     ══════════════════════════════════════════════ */
+  // Mini-okno (Document Picture-in-Picture), wspólny stan z głównym oknem
 
   var mini = { win: null, els: {}, timer: null };
 
@@ -1188,20 +1097,20 @@
     mini.win = null; mini.els = {}; mini.timer = null;
     var b = $('miniBtn');
     if (b) b.setAttribute('aria-pressed', 'false');
-    scheduleAgent();          // wróć do odliczania w głównym oknie
+    scheduleAgent();
     renderDial();
   }
 
   function buildMini(w) {
     mini.win = w;
     var d = w.document;
-    d.documentElement.lang = 'pl';
+    d.documentElement.lang = I18N ? I18N.get() : 'pl';
 
     var title = d.createElement('title');
     title.textContent = 'CHRONOS';
     d.head.appendChild(title);
 
-    // ten sam arkusz co duże okno — jedno źródło prawdy dla tokenów
+    // PiP to osobny dokument, style trzeba dołączyć
     var fonts = d.createElement('link');
     fonts.rel = 'stylesheet';
     fonts.href = new URL('fonts/fonts.css', location.href).href;
@@ -1214,12 +1123,12 @@
     d.body.className = 'mini';
     d.body.innerHTML =
       '<div class="mini__row">' +
-        '<span class="mini__cat"><i id="mCatDot"></i><span id="mCat">—</span></span>' +
+        '<span class="mini__cat"><i id="mCatDot"></i><span id="mCat">-</span></span>' +
         '<button class="mini__link" id="mExpand" type="button">' + tr('mini.expand') + '</button>' +
       '</div>' +
       '<div class="mini__row mini__row--main">' +
         '<span class="mini__time mono" id="mTime">00:00:00</span>' +
-        '<button class="mini__btn" id="mToggle" type="button" aria-label="Start lub pauza"></button>' +
+        '<button class="mini__btn" id="mToggle" type="button" aria-label="' + tr('dial.aria') + '"></button>' +
       '</div>' +
       '<div class="mini__foot">' +
         '<span class="mini__win" id="mWin"></span>' +
@@ -1245,13 +1154,9 @@
     });
 
     if (window.CHRONOS_RAIN) {
-      // mniejszy stopień i własne płótno — okno PiP ma osobny dokument
       rain.mini = window.CHRONOS_RAIN.mount(w, { into: d.body, size: 11, step: 90 });
     }
 
-    // Okno PiP jest z definicji widoczne, więc jego timery nie są dławione
-    // przez przeglądarkę — dzięki temu pomiar i agent chodzą pełną parą,
-    // nawet gdy duże okno jest zminimalizowane.
     mini.timer = w.setInterval(renderMini, 500);
     w.addEventListener('pagehide', teardownMini);
 
@@ -1268,10 +1173,7 @@
   function renderMini() {
     if (!mini.win || mini.win.closed || !mini.els.time) return;
 
-    /* Okno PiP nigdy nie jest dławione przez przeglądarkę, więc ta funkcja
-       chodzi co 500 ms przez cały dzień. Wszystko, co pokazuje, zmienia się
-       najwyżej raz na sekundę — klatka bez zmian wychodzi od razu, zanim
-       ruszy klasyfikator i sumowanie sesji. */
+    // Wołane co 500 ms przez cały dzień - bez zmian wychodzimy od razu.
     var stamp = Math.floor(activeElapsed() / 1000) + '|' + isRunning() + '|' +
       (state.active ? state.active.categoryId : state.selectedId) + '|' +
       (AGENT.on && AGENT.data ? AGENT.data.app + AGENT.data.title + AGENT.data.idle : '-');
@@ -1303,16 +1205,16 @@
 
     if (AGENT.on && AGENT.data) {
       var idle = Number(AGENT.data.idle || 0);
-      var meet = meetingOf(AGENT.data);
+      var meet = offlineLimit(AGENT.data) > OFFLINE_AFTER ? meetingOf(AGENT.data) : null;
       if (idle >= offlineLimit(AGENT.data)) {
-        mini.els.win.textContent = tr('kind.offline') + ' — ' + tr('kind.noActivity');
+        mini.els.win.textContent = tr('kind.offline') + ' - ' + tr('kind.noActivity');
         mini.els.win.dataset.off = '1';
       } else if (meet && idle >= OFFLINE_AFTER) {
-        mini.els.win.textContent = tr('mon.listening', { name: meet });
+        mini.els.win.textContent = tr('mon.listening', { name: label(meet) });
         mini.els.win.dataset.off = '0';
       } else {
         var cls = classifyWindow(AGENT.data);
-        mini.els.win.textContent = cls ? cls.group : '';
+        mini.els.win.textContent = cls ? label(cls.group) : '';
         mini.els.win.dataset.off = '0';
       }
     } else {
@@ -1321,13 +1223,11 @@
     }
   }
 
-  /* ══════════════════════════════════════════════
-     AKTYWNOŚĆ DNIA — podstawa rankingu i rozbicia
-     ══════════════════════════════════════════════ */
+  // Statystyki
 
-  /* odcinki przycięte do doby; dokładamy odcinek trwający w tej chwili */
+  // odcinki przycięte do doby, łącznie z bieżącym
   function activityForDay(day) {
-    var from = day, to = day + DAY, out = [];
+    var from = day, to = addDays(day, 1), out = [];
     function push(a) {
       var s0 = Math.max(a.s, from), e0 = Math.min(a.e, to);
       if (e0 - s0 <= 0) return;
@@ -1348,14 +1248,8 @@
     return out;
   }
 
-  /* ── próg krótkich formatów ──
-     Rolki, shorty i TikTok liczą się jako rozrywka dopiero wtedy, gdy w ciągu
-     doby uzbiera się ich ponad SHORT_GRACE. Poniżej progu cały ten czas jest
-     neutralny — zejście na minutę bywa szukaniem czegoś do pracy.
-
-     Liczymy to przy odczycie, a nie przy zapisie, i to celowo: próg zawsze
-     odpowiada aktualnej sumie dnia, działa wstecz na już zebranej historii
-     i sam się poprawia, gdy minuta przechyli szalę. */
+  // Przy odczycie, nie przy zapisie - próg zawsze odpowiada bieżącej sumie
+  // dnia i działa też na starej historii.
   function applyShortGrace(list) {
     var total = 0, i;
     for (i = 0; i < list.length; i++) if (list[i].short) total += list[i].ms;
@@ -1368,12 +1262,8 @@
     }
   }
 
-  /* ── ranking produktywności 0–100 ──
-     Trzy składowe, każda mierzy co innego i każda jest pokazana wprost:
-       A. Skupienie (0–55)  praca / (praca + rozrywka) — czym wypełniasz czas
-       B. Wolumen   (0–25)  ile pracy wobec celu dnia  — czy tego było dość
-       C. Ciągłość  (0–20)  średnia długość bloku pracy — czy nie w strzępach
-     Offline nie liczy się do niczego: nie karze i nie nagradza.            */
+  // Wynik 0-100: skupienie (55, praca vs rozrywka), wolumen (25, praca vs
+  // cel dnia), ciągłość (20, średni blok pracy). Offline się nie liczy.
 
   function scoreForDay(day) {
     var list = activityForDay(day);
@@ -1389,12 +1279,12 @@
 
     var hasAgent = list.length > 0;
 
-    // Bez agenta liczymy z ręcznych sesji i typu kategorii — ranking nadal działa.
+    // bez agenta: z ręcznych sesji i typu kategorii
     if (!hasAgent) {
       var sess = sessionsForDay(day);
       for (var j = 0; j < sess.length; j++) {
         var c = byId(sess[j].categoryId);
-        var ms = durationInRange(sess[j], day, day + DAY);
+        var ms = durationInRange(sess[j], day, addDays(day, 1));
         var k = c ? (c.kind || 'work') : 'neutral';
         if (k === 'work') work += ms;
         else if (k === 'chill') chill += ms;
@@ -1435,8 +1325,7 @@
 
   function renderScore(day) {
     var r = scoreForDay(day);
-    // procenty liczymy od całego zarejestrowanego czasu (z offline),
-    // żeby sumowały się do 100 i offline był widoczny wprost
+    // procenty łącznie z offline, żeby sumowały się do 100
     var zarejestrowany = r.active + r.offline;
     var pct = function (ms) { return zarejestrowany > 0 ? Math.round((ms / zarejestrowany) * 100) : 0; };
 
@@ -1465,7 +1354,7 @@
       var piece = el('span');
       piece.style.width = pct(m.ms) + '%';
       piece.style.background = m.c;
-      piece.title = m.k + ' — ' + fmtHM(m.ms);
+      piece.title = m.k + ' - ' + fmtHM(m.ms);
       bar.appendChild(piece);
 
       var li = el('li');
@@ -1503,11 +1392,11 @@
     });
 
     $('offlineNote').textContent = r.offline > 0
-      ? 'Offline ' + pct(r.offline) + '% (' + fmtHM(r.offline) + ') — poza wynikiem'
+      ? tr('score.offline', { pct: pct(r.offline), time: fmtHM(r.offline) })
       : '';
   }
 
-  /* ── rozbicie: co, gdzie i ile w obrębie kategorii ── */
+  // rozbicie kategorii na aplikacje i karty
 
   function drillBuckets(day) {
     var list = activityForDay(day);
@@ -1540,8 +1429,7 @@
     return buckets;
   }
 
-  /* "app.js - timer - Visual Studio Code" w grupie "Visual Studio Code"
-     czytamy jako "app.js - timer" — nazwa aplikacji jest już w nagłówku. */
+  // "app.js - timer - Visual Studio Code" -> "app.js - timer"
   function shortTab(tab, group) {
     var t = String(tab || '').trim();
     var g = String(group || '').trim();
@@ -1549,7 +1437,7 @@
     var tail = t.slice(-(g.length + 3)).toLowerCase();
     if (tail.indexOf(g.toLowerCase()) !== -1) {
       var cut = t.toLowerCase().lastIndexOf(g.toLowerCase());
-      if (cut > 0) t = t.slice(0, cut).replace(/[\s\-—–|·]+$/, '').trim();
+      if (cut > 0) t = t.slice(0, cut).replace(/[\s\-\u2014\u2013|·]+$/, '').trim();
     }
     return t || tab;
   }
@@ -1615,7 +1503,7 @@
       row.style.setProperty('--c', cur.color);
 
       var head = el('div', 'grow__head');
-      head.appendChild(el('span', 'grow__n', g.name));
+      head.appendChild(el('span', 'grow__n', label(g.name)));
       var gp = cur.ms > 0 ? Math.round((g.ms / cur.ms) * 100) : 0;
       head.appendChild(el('span', 'grow__pct', gp + '%'));
       head.appendChild(el('span', 'grow__v', fmtHM(g.ms)));
@@ -1636,7 +1524,7 @@
       var sub = el('div', 'grow__sub');
       arr.slice(0, 5).forEach(function (t) {
         var line = el('div', 'sline');
-        line.appendChild(el('span', 'sline__n', shortTab(t.name, g.name) || '—'));
+        line.appendChild(el('span', 'sline__n', label(shortTab(t.name, g.name)) || '-'));
         var tp = cur.ms > 0 ? Math.round((t.ms / cur.ms) * 100) : 0;
         line.appendChild(el('span', 'sline__pct', tp + '%'));
         line.appendChild(el('span', 'sline__v', fmtHM(t.ms)));
@@ -1650,9 +1538,7 @@
     });
   }
 
-  /* ══════════════════════════════════════════════
-     WIDOK MIESIĘCZNY
-     ══════════════════════════════════════════════ */
+  // Widok miesięczny
 
   function monthSummary(monthStart) {
     var count = daysInMonth(monthStart);
@@ -1697,16 +1583,15 @@
 
     $('mkTotal').textContent = fmtHM(m.total);
     $('mkWork').textContent = fmtHM(m.sum.work);
-    $('mkScore').textContent = m.scored ? m.avg : '—';
+    $('mkScore').textContent = m.scored ? m.avg : '-';
     $('mkBest').textContent = m.best
       ? new Date(m.best.day).toLocaleDateString(loc(), { day: 'numeric', month: 'short' }) +
         ' · ' + m.best.score
-      : '—';
+      : '-';
 
     $('monthDays').textContent = m.scored ? tr('month.days', { n: m.scored }) : '';
     $('monthEmpty').hidden = m.total > 0;
 
-    // ── kalendarz ──
     var cal = $('calendar');
     cal.innerHTML = '';
     var pad = m.dni.length ? m.dni[0].wd : 0;
@@ -1740,10 +1625,9 @@
             bar.appendChild(seg2);
           });
         cell.appendChild(bar);
-        cell.title = fmtDateLong(d.day) + ' — praca ' + fmtHM(d.work) +
-                     ', ranking ' + d.score + '/100';
+        cell.title = tr('cal.cellTitle', { date: fmtDateLong(d.day), work: fmtHM(d.work), score: d.score });
       } else {
-        cell.appendChild(el('div', 'cell__t cell__t--none', d.przyszly ? '' : '—'));
+        cell.appendChild(el('div', 'cell__t cell__t--none', d.przyszly ? '' : '-'));
       }
 
       cell.addEventListener('click', function () {
@@ -1753,7 +1637,6 @@
       cal.appendChild(cell);
     });
 
-    // ── podział miesiąca ──
     var mix = [
       { k: tr('kind.work'),    ms: m.sum.work,    c: '#3ddc84' },
       { k: tr('kind.chill'),   ms: m.sum.chill,   c: '#ffb454' },
@@ -1767,7 +1650,7 @@
       var piece = el('span');
       piece.style.width = pct(x.ms) + '%';
       piece.style.background = x.c;
-      piece.title = x.k + ' — ' + fmtHM(x.ms);
+      piece.title = x.k + ' - ' + fmtHM(x.ms);
       bar2.appendChild(piece);
 
       var li = el('li');
@@ -1780,7 +1663,6 @@
     });
     if (m.total === 0) bar2.innerHTML = '<span style="width:100%;background:var(--surface-3)"></span>';
 
-    // ── kategorie w skali miesiąca ──
     var perCat = {}, catTotal = 0;
     m.dni.forEach(function (d) {
       activityForDay(d.day).forEach(function (a) {
@@ -1848,14 +1730,13 @@
     var today = startOfDay(Date.now());
 
     $('statsDate').textContent = day === today ? tr('stats.todayIs') + ' · ' + fmtDateShort(day)
-      : (day === today - DAY ? 'Wczoraj · ' + fmtDateShort(day) : fmtDateLong(day));
+      : (day === addDays(today, -1) ? tr('stats.yesterday') + ' · ' + fmtDateShort(day) : fmtDateLong(day));
     $('nextDay').disabled = day >= today;
 
-    // KPI
     $('kTotal').textContent = fmtHM(t.total);
     $('kSessions').textContent = list.length;
     $('kAvg').textContent = list.length ? fmtHM(t.total / list.length) : '0m';
-    $('kTop').textContent = t.rows.length ? t.rows[0].name : '—';
+    $('kTop').textContent = t.rows.length ? t.rows[0].name : '-';
     $('donutTotal').textContent = t.total ? fmtHM(t.total) : '0h';
 
     renderScore(day);
@@ -1922,7 +1803,6 @@
   function renderHours(list, day) {
     var host = $('hours');
     host.innerHTML = '';
-    // bucket[hour][categoryId] = ms
     var buckets = [], maxMs = 1;
     for (var h = 0; h < 24; h++) {
       var from = day + h * 3600000, to = from + 3600000;
@@ -1937,12 +1817,12 @@
       maxMs = Math.max(maxMs, b.total);
       buckets.push(b);
     }
-    var scale = Math.max(maxMs, 900000); // min. skala 15 min, żeby słupki nie kłamały
+    var scale = Math.max(maxMs, 900000); // min. 15 min, żeby krótkie sesje nie dawały pełnych słupków
 
     buckets.forEach(function (b, h) {
       var col = el('div', 'hcol');
       col.dataset.empty = b.total > 0 ? '0' : '1';
-      col.title = pad(h) + ':00 — ' + (b.total > 0 ? fmtHM(b.total) : tr('hours.none'));
+      col.title = pad(h) + ':00 - ' + (b.total > 0 ? fmtHM(b.total) : tr('hours.none'));
       b.parts.forEach(function (p) {
         var c = byId(p.id);
         var seg = el('i');
@@ -1971,7 +1851,7 @@
       row.appendChild(nm);
 
       row.appendChild(el('div', 'lrow__span', fmtTime(s.start) + ' → ' + (s.live ? tr('log.now') : fmtTime(s.end))));
-      row.appendChild(el('div', 'lrow__dur', fmtHM(durationInRange(s, day, day + DAY))));
+      row.appendChild(el('div', 'lrow__dur', fmtHM(durationInRange(s, day, addDays(day, 1)))));
 
       var del = el('button', 'iconbtn');
       del.type = 'button';
@@ -2004,9 +1884,7 @@
     });
   }
 
-  /* ══════════════════════════════════════════════
-     MODAL KATEGORII
-     ══════════════════════════════════════════════ */
+  // Modal kategorii
 
   function openCat(id) {
     ui.editingId = id || null;
@@ -2057,7 +1935,7 @@
       var b = el('button', 'sw');
       b.type = 'button';
       b.style.setProperty('--c', col);
-      b.setAttribute('aria-label', 'Kolor ' + col);
+      b.setAttribute('aria-label', tr('cat.colorAria', { color: col }));
       b.setAttribute('aria-pressed', String(ui.draft.color.toLowerCase() === col));
       b.addEventListener('click', function () {
         ui.draft.color = col;
@@ -2111,7 +1989,7 @@
     paintLogo($('pvLogo'), { name: name || '?', logo: ui.draft.logo }, 22);
   }
 
-  /* skalowanie obrazka do 128 px (data URL) */
+  // przycina do kwadratu 128 px, zwraca data URL
   function processImage(file, done) {
     if (!file) return;
     if (file.size > 6 * 1024 * 1024) { toast(tr('toast.fileTooBig')); return; }
@@ -2141,7 +2019,7 @@
       var drop = $('drop');
       drop.classList.add('has-file');
       drop.innerHTML = '';
-      var input = el('input'); // odtwórz ukryty input
+      var input = el('input'); // innerHTML = '' usunął też input
       input.type = 'file'; input.id = 'fFile'; input.accept = 'image/*'; input.hidden = true;
       input.addEventListener('change', function (e) { if (e.target.files[0]) acceptFile(e.target.files[0]); });
       var im = document.createElement('img'); im.src = dataUrl; im.alt = '';
@@ -2159,7 +2037,7 @@
 
     var logo = ui.draft.logo;
     if (logo.type === 'icon' && !(ICO && ICO.has(logo.value))) logo = { type: 'mono' };
-    if (logo.type === 'emoji' && !logo.value) logo = { type: 'mono' };
+    if (logo.type === 'emoji') logo = { type: 'mono' };
 
     var rules = $('fRules').value.split(',').map(function (r) { return r.trim(); })
       .filter(function (r) { return r.length > 0; });
@@ -2196,9 +2074,7 @@
     toast(tr('toast.catDeleted', { name: c.name }));
   }
 
-  /* ══════════════════════════════════════════════
-     IMPORT / EKSPORT
-     ══════════════════════════════════════════════ */
+  // Import / eksport
 
   function exportJSON() {
     var data = JSON.stringify({ v: 1, exportedAt: new Date().toISOString(),
@@ -2223,6 +2099,7 @@
         if (!window.confirm(tr('confirm.import', {
               cats: d.categories.length, sessions: d.sessions.length
             }))) return;
+        iconizeLogos(d.categories);
         state.categories = d.categories;
         state.sessions = d.sessions;
         state.activity = act;
@@ -2234,10 +2111,6 @@
     };
     fr.readAsText(file);
   }
-
-  /* ══════════════════════════════════════════════
-     TOAST
-     ══════════════════════════════════════════════ */
 
   var toastTimer = null;
   function toast(msg, action) {
@@ -2263,10 +2136,6 @@
     toastTimer = setTimeout(function () { t.classList.remove('is-on'); }, action ? 6000 : 2600);
   }
 
-  /* ══════════════════════════════════════════════
-     RENDER ALL + INIT
-     ══════════════════════════════════════════════ */
-
   function renderAll() { renderRail(); renderDial(); renderPanel(); renderMonitor(); renderMini(); }
 
   function stepStats(dir) {
@@ -2277,7 +2146,7 @@
       ui.statsMonth = next;
     } else {
       if (dir > 0 && ui.statsDay >= today) return;
-      ui.statsDay += dir * DAY;
+      ui.statsDay = addDays(ui.statsDay, dir);
     }
     renderStats();
   }
@@ -2293,33 +2162,25 @@
 
   var rain = { main: null, mini: null };
 
-  /* Deszcz znaków w tle. Osobne płótno dla każdego okna, bo mini-nakładka
-     to prawdziwe okno systemowe z własnym `document`. */
+  // Osobne płótno na okno, bo mini-okno ma własny document.
   function startRain() {
     if (!window.CHRONOS_RAIN) return;
     var host = document.querySelector('.ambient');
     if (host && !rain.main) rain.main = window.CHRONOS_RAIN.mount(window, { into: host, size: 15 });
   }
 
-  /* ══════════════════════════════════════════════
-     JĘZYK
-
-     Pierwsze uruchomienie zaczyna się od jednego pytania: polski czy
-     angielski. Nie zgadujemy po ustawieniach przeglądarki — one tylko
-     podpowiadają, który przycisk podświetlić. Wybór da się zmienić
-     w każdej chwili, w stopce okna statystyk.
-     ══════════════════════════════════════════════ */
+  // Język: przy pierwszym uruchomieniu pytamy, przeglądarka tylko podpowiada.
 
   function applyLang() {
     if (!I18N) return;
     I18N.apply();
     markLangButtons();
-    // teksty budowane w JS trzeba przerysować — atrybuty ich nie obejmują
+    // I18N.apply() nie obejmuje tekstów budowanych w JS
     applyAccent(); renderAll();
     $('todayDate').textContent = fmtDateLong(Date.now());
     if (!$('statsOverlay').hidden) renderStats();
     renderMonitor();
-    miniLast = '';                 // zmiana języka musi przebić klatkę bez zmian
+    miniLast = '';                 // wymusza przerysowanie mini-okna
     if (mini.win && !mini.win.closed) renderMini();
   }
 
@@ -2341,8 +2202,7 @@
   function askLanguage(after) {
     var box = $('langOverlay');
     if (!box || !I18N) { if (after) after(); return; }
-    // podświetlamy to, co podpowiada przeglądarka — ale nic nie zapisujemy,
-    // dopóki użytkownik sam nie kliknie
+    // podświetlamy propozycję przeglądarki, bez zapisu
     I18N.set(I18N.guess(), false);
     I18N.apply();
     markLangButtons();
@@ -2353,9 +2213,8 @@
       if (!b) return;
       box.hidden = true;
       if (after) {
-        // pierwsze uruchomienie: aplikacja jeszcze nie wstała, więc sam wybór
-        // zapisujemy, a resztę startu odpalamy dopiero teraz — dzięki temu
-        // kategorie startowe i format daty od razu są w wybranym języku
+        // boot dopiero po wyborze, żeby kategorie startowe i daty były
+        // od razu w wybranym języku
         I18N.set(b.dataset.lang);
         var go = after; after = null; go();
       } else {
@@ -2364,7 +2223,6 @@
     });
   }
 
-  /* Pierwsze pytanie przed czymkolwiek innym: w jakim języku ma to mówić. */
   function init() {
     if (I18N) I18N.apply();
     if (I18N && !I18N.stored()) askLanguage(boot);
@@ -2383,9 +2241,9 @@
 
     if (state.active && typeof ui.wznowPo === 'number') {
       var minione = fmtHM(activeElapsed());
-      var nazwaKat = (byId(state.active.categoryId) || {}).name || 'sesja';
+      var nazwaKat = (byId(state.active.categoryId) || {}).name || tr('common.session');
       if (ui.wznowPo < 5 * 60000) {
-        // krótka przerwa (restart apki, odświeżenie) — wracamy do liczenia
+        // krótka przerwa (restart, odświeżenie) - wznawiamy
         state.active.segmentStart = Date.now();
         save(); renderAll();
         setTimeout(function () {
@@ -2404,7 +2262,12 @@
       }, 600);
     }
 
-    // tarcza + sterowanie
+    // wciśnięty przycisk myszy wstrzymuje cykliczne przerysowanie (patrz tick)
+    document.addEventListener('pointerdown', function () { ui.holding = true; }, true);
+    ['pointerup', 'pointercancel', 'blur'].forEach(function (ev) {
+      window.addEventListener(ev, function () { ui.holding = false; }, true);
+    });
+
     $('dial').addEventListener('click', toggle);
     $('playBtn').addEventListener('click', toggle);
     $('stopBtn').addEventListener('click', function () { commit(false); });
@@ -2418,7 +2281,6 @@
       save(); renderDial();
     });
 
-    // kategorie
     $('addCatBtn').addEventListener('click', function () { openCat(null); });
     $('closeCat').addEventListener('click', closeCat);
     $('cancelCat').addEventListener('click', closeCat);
@@ -2449,7 +2311,6 @@
       if (f) acceptFile(f);
     });
 
-    // statystyki
     $('miniBtn').addEventListener('click', toggleMini);
     if (!miniSupported()) $('miniBtn').hidden = true;
     $('openStats').addEventListener('click', openStats);
@@ -2466,7 +2327,6 @@
       if (window.confirm(msg)) reset(false);
     });
 
-    // agent lokalny
     $('autoToggle').addEventListener('click', function () {
       state.autoSwitch = !state.autoSwitch;
       save(); renderMonitor();
@@ -2479,14 +2339,12 @@
       e.target.value = '';
     });
 
-    // kliknięcie w tło zamyka
     [['statsOverlay', null], ['catOverlay', null]].forEach(function (p) {
       $(p[0]).addEventListener('mousedown', function (e) {
         if (e.target === $(p[0])) $(p[0]).hidden = true;
       });
     });
 
-    // skróty klawiszowe
     document.addEventListener('keydown', function (e) {
       var inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
       var catOpen = !$('catOverlay').hidden;
@@ -2518,14 +2376,12 @@
       }
     });
 
-    // spacja na tarczy/przycisku nie powinna się dublować
+    // bez tego spacja na przycisku przełączałaby dwa razy
     $('dial').addEventListener('keydown', function (e) { if (e.code === 'Space') e.preventDefault(); });
     $('playBtn').addEventListener('keydown', function (e) { if (e.code === 'Space') e.preventDefault(); });
 
-    // ostrzeżenie przy zamknięciu z aktywnym pomiarem
-    /* Przy zamykaniu zatrzymujemy zegar i zapisujemy wszystko, co jest
-       w pamięci. Zapis pomijamy tylko wtedy, gdy naprawdę nie ma czego
-       zapisać — inaczej druga karta nadpisałaby świeższe dane pierwszej. */
+    // Przy zamknięciu zatrzymujemy zegar i zapisujemy. Bez aktywnego stanu
+    // nie zapisujemy, żeby nie nadpisać świeższych danych innej karty.
     var zapisanoPrzyWyjsciu = false;
     function zapiszNaWyjscie() {
       if (zapisanoPrzyWyjsciu) return;

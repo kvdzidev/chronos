@@ -1,15 +1,5 @@
-/* ══════════════════════════════════════════════════════════════
-   CHRONOS — dark technical UI
-   Canvas + hairline discipline (Linear), uppercase micro-caps
-   (SpaceX), jade accent nad deszczem znaków. Zero decorative gradients.
-
-   Tło jest zielono-czarne, a nie neutralnie czarne: pod spodem pada
-   deszcz kanji (rain.js) i powierzchnie muszą siedzieć w tej samej
-   rodzinie barw, inaczej panele wyglądałyby jak naklejone na tapetę.
-   ══════════════════════════════════════════════════════════════ */
-
 :root {
-  /* surfaces */
+  /* surfaces - zielonkawe, żeby pasowały do deszczu z rain.js */
   --canvas:          #040806;
   --canvas-deep:     #020403;
   --surface-1:       #0a1009;
@@ -32,7 +22,7 @@
   --amber:       #ffb454;
   --danger:      #ff6b6b;
 
-  /* deszcz znaków — te same wartości co w rain.js */
+  /* deszcz znaków - te same wartości co w rain.js */
   --rain-head:   #e4fff0;
   --rain-body:   #2fbf6d;
 
@@ -56,7 +46,7 @@
 
 * { box-sizing: border-box; }
 
-/* [hidden] musi wygrywac z display:flex/grid na komponentach */
+/* [hidden] ma wygrywać z display:flex/grid na komponentach */
 [hidden] { display: none !important; }
 
 html {
@@ -71,7 +61,7 @@ body {
   margin: 0;
 }
 
-/* dostepne tylko dla czytnikow ekranu */
+/* tylko dla czytników ekranu */
 .sr-only {
   position: absolute; width: 1px; height: 1px;
   margin: -1px; padding: 0; overflow: hidden;
@@ -99,11 +89,8 @@ body {
   border-radius: var(--r-xs);
 }
 
-/* ─────────────── deszcz znaków ─────────────── */
+/* Deszcz znaków */
 
-/* Płótno rysuje rain.js — tu tylko mówimy, gdzie ma paść i jak mocno.
-   Środek ekranu należy do tarczy: maska wygasza tam deszcz, żeby cyfry
-   zostały czytelne przez cały dzień, a nie tylko na zrzucie ekranu. */
 .rain {
   position: absolute;
   inset: 0;
@@ -111,9 +98,7 @@ body {
   width: 100%;
   height: 100%;
   opacity: .34;
-  /* Dwie maski naraz: dziura na tarczę w środku i wygaszenie przy krawędziach,
-     żeby deszcz nie napierał na szynę i panel. `intersect` zostawia tylko to,
-     co przechodzi obie — stąd pierścień znaków wokół zegara. */
+  /* dziura na tarczę + wygaszanie przy krawędziach, intersect zostawia część wspólną */
   mask-image:
     radial-gradient(ellipse 42% 42% at 50% 46%, transparent 2%, #000 72%),
     linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
@@ -124,7 +109,7 @@ body {
   -webkit-mask-composite: source-in;
 }
 
-/* ─────────────── ambient background ─────────────── */
+/* Ambient background */
 
 
 .ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
@@ -153,7 +138,7 @@ body {
   opacity: .5;
 }
 
-/* ─────────────── app shell ─────────────── */
+/* App shell */
 
 .app {
   position: relative; z-index: 1;
@@ -163,7 +148,7 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-/* ═══════════════ LEFT RAIL ═══════════════ */
+/* Left rail */
 
 .rail {
   display: flex; flex-direction: column;
@@ -245,7 +230,6 @@ body {
   flex: none;
 }
 .cat__logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cat__logo--emoji { font-size: 15px; line-height: 1; }
 
 .cat__body { min-width: 0; }
 .cat__name {
@@ -283,7 +267,7 @@ body {
 
 .rail__foot { padding: 12px; border-top: 1px solid var(--hairline); }
 
-/* ═══════════════ BUTTONS ═══════════════ */
+/* Buttons */
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -345,7 +329,7 @@ kbd {
 .iconbtn:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); border-color: var(--hairline-strong); }
 .iconbtn:disabled { opacity: .3; cursor: not-allowed; }
 
-/* ═══════════════ STAGE / TIMER ═══════════════ */
+/* Stage / timer */
 
 .stage {
   display: flex; flex-direction: column; align-items: center;
@@ -356,11 +340,7 @@ kbd {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
 }
 
-/* Wskaźnik stanu ma się czytać jak dioda na panelu, a nie jak kolorowa
-   plakietka: prostokąt zamiast pigułki, pasek na krawędzi zamiast świecącej
-   kropki, a kolor niesie wyłącznie stan — obramowanie zostaje włosowe
-   w każdym z nich. Podświetlona ramka wokół całości była tym, co robiło
-   z paska naklejkę. */
+/* status: prostokąt z paskiem na krawędzi, kolor zależy tylko od stanu */
 .status {
   display: inline-flex; align-items: stretch;
   height: 27px;
@@ -391,7 +371,6 @@ kbd {
 .status[data-state="paused"] { color: var(--amber); }
 .status[data-state="paused"] .status__dot { background: var(--amber); }
 
-/* pasek gaśnie i wraca — bez halo i bez skalowania */
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .34; } }
 
 .stage__meta {
@@ -462,8 +441,7 @@ kbd {
 .dial__catdot { width: 5px; height: 5px; border-radius: 50%; background: var(--dial-c1); flex: none; }
 
 .dial__time {
-  /* Pierścień ma 0,778 średnicy tarczy, a "00:00:00" ~4,8em szerokości.
-     0,15 trzyma napis w środku koła na każdym rozmiarze okna. */
+  /* pierścień ma 0.778 średnicy tarczy, "00:00:00" ok. 4.8em - przy 0.142 mieści się w środku */
   font-size: calc(var(--dial-size) * 0.142);
   max-width: calc(var(--dial-size) * 0.72);
   font-weight: 400; line-height: 1;
@@ -550,7 +528,7 @@ kbd {
 }
 .mon__screens { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 
-/* kafelek "co leci na drugim monitorze" — cyfra ekranu + nazwa */
+/* kafelek drugiego monitora: numer ekranu + nazwa */
 .mon__screen {
   display: inline-flex; align-items: center; gap: 5px;
   max-width: 168px;
@@ -574,7 +552,7 @@ kbd {
 .mon__screen[data-kind="chill"] .mon__screen-n { background: color-mix(in srgb, var(--amber) 18%, var(--surface-3)); color: var(--amber); }
 
 .mon__idle { flex: none; font-size: 10.5px; color: var(--amber); }
-/* na spotkaniu bezczynność nie jest ostrzeżeniem, tylko informacją */
+/* na spotkaniu bezczynność to nie ostrzeżenie */
 .mon__idle[data-meet="1"] { color: var(--accent); }
 .mon__arrow { flex: none; color: var(--ink-tertiary); }
 .mon__match {
@@ -595,7 +573,7 @@ kbd {
   border-color: color-mix(in srgb, var(--dial-c1) 40%, transparent);
 }
 
-/* ═══════════════ RIGHT PANEL ═══════════════ */
+/* Right panel */
 
 .panel {
   border-left: 1px solid var(--hairline);
@@ -603,7 +581,7 @@ kbd {
   display: flex; flex-direction: column; min-height: 0;
   overflow-y: auto; overscroll-behavior: contain;
 }
-/* elementy o stalej wysokosci nie moga byc sciskane przez przewijany kontener */
+/* stała wysokość - przewijany kontener nie może ich ściskać */
 .panel > * { flex: 0 0 auto; }
 .rail > *:not(.cats) { flex: 0 0 auto; }
 
@@ -691,7 +669,7 @@ kbd {
 .rrow__d { font-family: var(--mono); font-size: 11.5px; color: var(--ink-muted); }
 .rrow--live .rrow__d { color: var(--dial-c2); }
 
-/* ═══════════════ OVERLAYS / SHEETS ═══════════════ */
+/* Overlays / sheets */
 
 .overlay {
   position: fixed; inset: 0; z-index: 50;
@@ -754,8 +732,7 @@ kbd {
 .foot-note { font-size: 11px; color: var(--ink-tertiary); }
 .foot-r { display: flex; align-items: center; gap: 14px; margin-left: auto; }
 
-/* Przełącznik języka: dwa pola w jednej ramce, tak jak przełącznik zakresu
-   w nagłówku statystyk. Ta sama rodzina kształtów, nie nowy wynalazek. */
+/* przełącznik języka, ten sam kształt co zakres w statystykach */
 .langpick {
   display: inline-flex; flex: none;
   border: 1px solid var(--hairline-strong); border-radius: var(--r-sm);
@@ -775,7 +752,7 @@ kbd {
   color: var(--accent);
 }
 
-/* ─────────────── wybór języka na starcie ─────────────── */
+/* Wybór języka na starcie */
 
 .overlay--lang { z-index: 60; }
 .lang { max-width: 430px; }
@@ -909,7 +886,7 @@ kbd {
 .lrow:hover .iconbtn, .lrow .iconbtn:focus-visible { opacity: 1; }
 .lrow .iconbtn:hover { color: var(--danger); }
 
-/* ═══════════════ CATEGORY FORM ═══════════════ */
+/* Category form */
 
 .preview {
   display: flex; align-items: center; gap: 14px;
@@ -979,9 +956,7 @@ kbd {
 .field .hint { font-size: 11.5px; }
 .field .hint b { color: var(--ink-subtle); font-weight: 500; }
 
-/* Ikony zamiast emoji: jedna kreska, jeden kolor, ten sam rysunek na każdym
-   systemie. Kafelek po najechaniu tylko jaśnieje — bez skoku skali, bo to
-   właśnie ten skok robił z siatki zabawkę. */
+/* hover bez scale, ze skalowaniem siatka skakała */
 .icon-grid {
   display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px;
 }
@@ -1037,7 +1012,7 @@ kbd {
 }
 
 
-/* ═══════════════ RANKING PRODUKTYWNOŚCI ═══════════════ */
+/* Ranking produktywności */
 
 .score {
   display: grid;
@@ -1102,7 +1077,7 @@ kbd {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ═══════════════ SZCZEGÓŁY KATEGORII ═══════════════ */
+/* Szczegóły kategorii */
 
 .dtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .dtab {
@@ -1175,7 +1150,7 @@ kbd {
 .sline__v { font-family: var(--mono); font-size: 11px; color: var(--ink-tertiary); flex: none; }
 .sline--more { color: var(--ink-tertiary); font-size: 11px; }
 
-/* ═══════════════ TYP KATEGORII ═══════════════ */
+/* Typ kategorii */
 
 .kinds {
   display: inline-flex; gap: 2px; padding: 3px;
@@ -1204,10 +1179,9 @@ kbd {
 
 
 
-/* ═══════════════ WIDOK MIESIĘCZNY ═══════════════ */
+/* Widok miesięczny */
 
-/* monthView i dayView to pojedyncze dzieci .sheet__body, wiec odstepy
-   miedzy sekcjami musza byc zdefiniowane w srodku */
+/* monthView i dayView to jedyne dzieci .sheet__body, więc odstępy są w środku */
 #monthView, #dayView {
   display: flex; flex-direction: column; gap: 26px;
   min-width: 0;
@@ -1297,17 +1271,15 @@ kbd {
   .cal__legend-note { margin-left: 0; flex-basis: 100%; }
 }
 
-/* ─────────────── duże ekrany ───────────────
-   Okno startuje zmaksymalizowane, więc na szerokich monitorach układ ma
-   urosnąć, a nie utonąć w pustce: szersze kolumny, większa tarcza. */
+/* Duże ekrany (okno startuje zmaksymalizowane) */
 @media (min-width: 1800px) {
   :root { --rail-w: 300px; --panel-w: 356px; }
   .dial { --dial-size: min(62vh, 660px); }
   body { font-size: 14.5px; }
 }
 
-/* ═══════════════ MINI-NAKŁADKA (okno PiP) ═══════════════ */
-/* Skala oparta na cqw/vw, bo to okno użytkownik dowolnie rozciąga. */
+/* Mini-nakładka (okno PiP) */
+/* rozmiary w cqw/vw, bo okno PiP można dowolnie rozciągać */
 
 .mini {
   height: 100vh;
@@ -1328,8 +1300,7 @@ kbd {
   position: relative;
 }
 
-/* w nakładce deszcz jest ciszej i bez dziury w środku — okno bywa
-   wysokie na 60 px, więc maska z dużego okna zjadłaby go w całości */
+/* w PiP bez dziury w masce - okno bywa wysokie na 60 px */
 .mini > .rain {
   opacity: .3;
   mask-image: linear-gradient(90deg, #000, rgba(0,0,0,.25) 55%, transparent);
@@ -1405,7 +1376,7 @@ kbd {
 .mini__win[data-off="1"] { color: var(--amber); }
 .mini__day { flex: none; letter-spacing: 0; }
 
-/* bardzo niskie okno: chowamy stopkę, żeby czas nie został ścięty */
+/* bardzo niskie okno: bez stopki, żeby czas się nie ucinał */
 @media (max-height: 108px) {
   .mini__foot { display: none; }
 }
@@ -1422,7 +1393,7 @@ kbd {
   border-color: color-mix(in srgb, var(--dial-c1) 30%, transparent);
 }
 
-/* ═══════════════ TOAST ═══════════════ */
+/* Toast */
 
 .toast {
   position: fixed; left: 50%; bottom: 26px; z-index: 90;
@@ -1449,14 +1420,14 @@ kbd {
 }
 .toast__act:hover { background: rgba(70,224,245,.1); border-color: var(--accent); }
 
-/* ═══════════════ SCROLLBARS ═══════════════ */
+/* Scrollbars */
 
 *::-webkit-scrollbar { width: 9px; height: 9px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 9px; border: 3px solid transparent; background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: var(--hairline-hot); background-clip: content-box; }
 
-/* ═══════════════ RESPONSIVE ═══════════════ */
+/* Responsive */
 
 @media (max-width: 1180px) {
   :root { --rail-w: 232px; --panel-w: 280px; }
@@ -1464,7 +1435,7 @@ kbd {
   .kpi:nth-child(2) { border-right: 0; }
   .kpi:nth-child(-n+2) { border-bottom: 1px solid var(--hairline); }
   .grid2 { grid-template-columns: 1fr; }
-  /* w ukladzie jednokolumnowym: donut obok legendy, nie nad nia */
+  /* jedna kolumna: donut obok legendy, nie nad nią */
   .grid2 > .block:first-child {
     display: grid; gap: 6px 28px; align-items: center;
     grid-template-columns: 200px minmax(0, 1fr);

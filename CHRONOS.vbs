@@ -1,10 +1,4 @@
-' ════════════════════════════════════════════════════════════
-'  CHRONOS — uruchomienie jednym kliknieciem
-'
-'  Startuje chronos.py bez okna konsoli. Ten jeden proces
-'  serwuje aplikacje, czyta aktywne okno i otwiera okno apki.
-'  Zamkniecie okna aplikacji konczy wszystko.
-' ════════════════════════════════════════════════════════════
+' Odpala chronos.py bez okna konsoli.
 
 Option Explicit
 

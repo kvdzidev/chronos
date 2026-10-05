@@ -1,15 +1,5 @@
-/* ══════════════════════════════════════════════════════════════
-   CHRONOS — zestaw ikon kategorii
-
-   Kreska zamiast emoji. Emoji ciągnie za sobą cudzy krój, cudze kolory
-   i inny rysunek na każdym systemie — w interfejsie zbudowanym z włosowych
-   linii wygląda jak naklejka. Te ikony są rysowane tą samą kreską co reszta
-   aplikacji i dziedziczą kolor akcentu kategorii przez `currentColor`,
-   więc domyślnie są zielone, a po zmianie koloru kategorii — w jej kolorze.
-
-   Siatka 24×24, wyłącznie obrys, grubość 1.6, zaokrąglone końce.
-   Dopisanie własnej ikony to jedna linia: nazwa → wnętrze <svg>.
-   ══════════════════════════════════════════════════════════════ */
+// CHRONOS - ikony kategorii: siatka 24x24, sam obrys 1.6, kolor z currentColor.
+// Wpis = nazwa i wnętrze <svg>.
 (function (global) {
   'use strict';
 
@@ -64,11 +54,7 @@
     'dumbbell', 'coffee', 'music', 'film', 'gamepad', 'camera', 'mic', 'moon'
   ];
 
-  /**
-   * Gotowy <svg> jako tekst.
-   * @param {string} name  nazwa z ORDER
-   * @param {number} size  bok w px
-   */
+  // gotowy <svg> jako tekst, size = bok w px
   function svg(name, size) {
     var body = ICONS[name];
     if (!body) return '';
